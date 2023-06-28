@@ -15,7 +15,7 @@ path=${11}
 echo $path
 if [ -n "$dim_n" ] && [ -n "$dim_N" ] && [ -n "$mod_q" ] && [ -n "$mod_logQ" ] && [ -n "$mod_Qks" ] && [ -n "$B_g" ] && [ -n "$B_ks" ] && [ -n "$B_rk" ] && [ -n "$sigma" ]
 then
-  $path/build/bin/examples/binfhe/boolean-3-AND-OR-script -n $dim_n -q $mod_q -N $dim_N -Q $mod_logQ -k $mod_Qks -g $B_g -b $B_ks -r $B_rk -s $sigma -i $num_samples
+  $path/build/bin/boolean_noise_estimate_script -n $dim_n -q $mod_q -N $dim_N -Q $mod_logQ -k $mod_Qks -g $B_g -b $B_ks -r $B_rk -s $sigma -i $num_samples
 else
   echo "argument missing"
 fi
