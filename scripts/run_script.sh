@@ -10,12 +10,14 @@ B_ks=$7
 B_rk=$8
 sigma=$9
 num_samples=${10}
-path=${11}
+secret_dist=${11}
+bootstrapping_tech=${12}
+path=${13}
 
 echo $path
 if [ -n "$dim_n" ] && [ -n "$dim_N" ] && [ -n "$mod_q" ] && [ -n "$mod_logQ" ] && [ -n "$mod_Qks" ] && [ -n "$B_g" ] && [ -n "$B_ks" ] && [ -n "$B_rk" ] && [ -n "$sigma" ]
 then
-  $path/build/bin/boolean_noise_estimate_script -n $dim_n -q $mod_q -N $dim_N -Q $mod_logQ -k $mod_Qks -g $B_g -b $B_ks -r $B_rk -s $sigma -i $num_samples
+  $path/bin/boolean_noise_estimate_script -n $dim_n -q $mod_q -N $dim_N -Q $mod_logQ -k $mod_Qks -g $B_g -b $B_ks -r $B_rk -s $sigma -t $bootstrapping_tech -d $secret_dist -i $num_samples
 else
   echo "argument missing"
 fi

@@ -33,8 +33,7 @@
   Example for the FHEW scheme using the default bootstrapping method (GINX)
  */
 #define PROFILE
-
-#include "binfhecontext.h"
+#include "openfhe/binfhe/binfhecontext.h"
 #include "utils/sertype.h"
 #include "utils/serial.h"
 #include <getopt.h>
@@ -50,6 +49,8 @@ usint B_g    = 0;
 usint B_ks   = 0;
 usint B_rk   = 32;
 usint sigma  = 3.19;
+usint bootstrapping_technique = 0;
+usint secret_dist = 0;
 
 void usage() {
     std::cout << "-n Lattice Dimension"
@@ -60,7 +61,9 @@ void usage() {
               << "-g Digit base B_g"
               << "-r Refreshing key base B_rk"
               << "-b Key switching base B_ks"
-              << "-s sigma (standard deviation)" << std::endl;
+              << "-s sigma (standard deviation)" 
+              << "-t Bootstrapping technique" 
+              << "-d Secret key distribution" << std::endl;
 }
 int main(int argc, char* argv[]) {
     // Sample Program: Step 1: Set CryptoContext
@@ -78,10 +81,12 @@ int main(int argc, char* argv[]) {
                                            {"Refreshing key base B_rk", required_argument, NULL, 'r'},
                                            {"Key switching base B_ks", required_argument, NULL, 'b'},
                                            {"sigma (standard deviation)", required_argument, NULL, 's'},
+                                           {"Bootstrapping technique", required_argument, NULL, 't'},
+                                           {"Secret key distribution", required_argument, NULL, 'd'},
                                            {"help", no_argument, NULL, 'h'},
                                            {NULL, 0, NULL, 0}};
 
-    const char* optstring = "n:N:q:Q:k:g:r:b:s:h";
+    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:h";
     while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         std::cout << "opt1: " << opt << "; optarg: " << optarg << std::endl;
         switch (opt) {
@@ -112,6 +117,12 @@ int main(int argc, char* argv[]) {
             case 's':
                 sigma = atoi(optarg);
                 break;
+            case 't':
+                bootstrapping_technique = atoi(optarg);
+                break;
+            case 'd':
+                secret_dist = atoi(optarg);
+                break;
             case 'h':
                 usage();
             default:
@@ -130,6 +141,14 @@ int main(int argc, char* argv[]) {
     paramset.stdDev       = sigma;
     paramset.latticeParam = dim_n;
 
+    if (secret_dist == 0) {
+        paramset.keyDist = GAUSSIAN;
+    } else if (secret_dist == 1) {
+        paramset.keyDist = UNIFORM_TERNARY;
+    } else {
+        OPENFHE_THROW(not_available_error, "Invalid Secret Key distribution");
+    }
+
     // ********************
     // STD128 is the security level of 128 bits of security based on LWE Estimator
     // and HE standard. Other common options are TOY, MEDIUM, STD192, and STD256.
@@ -140,7 +159,18 @@ int main(int argc, char* argv[]) {
     std::cout << "parameters from commandline dim_n, dim_N, logQ, q, Qks, B_g, B_ks: "
               << " " << dim_n << " " << dim_N << " " << logQ << " " << ctmodq << " " << Qks << " " << B_g << " " << B_ks
               << std::endl;
-    cc.GenerateBinFHEContext(paramset);
+
+    BINFHE_METHOD bt;
+    if (secret_dist == 1) {
+        bt = AP;
+    } else if (secret_dist == 2) {
+        bt = GINX;
+    } else if (secret_dist == 3) {
+        bt = LMKCDEY;
+    } else {
+        OPENFHE_THROW(not_available_error, "Invalid bootstrapping technique");
+    }
+    cc.GenerateBinFHEContext(paramset, bt);
 
     // Sample Program: Step 2: Key Generation
 

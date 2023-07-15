@@ -152,8 +152,15 @@ def get_noise_from_cpp_code(param_set, num_of_samples, perfNumbers = False):
     B_ks = param_set.B_ks #baseKS
     B_rk = param_set.B_rk #baseRK
     sigma = param_set.sigma #sigma stddev
-    bashCommand = syspath + "/scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + syspath + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
+    secret_dist = param_set.secret_dist #secret distribution used
+    bootstrapping_tech = param_set.bootstrapping_tech #bootstrapping technique used
 
+    bashCommand = ""
+
+    if mod_logQ <32:
+        bashCommand = syspath + "/scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + str(syspath + "../build32") + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
+    else:
+        bashCommand = syspath + "/scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + str(syspath + "../build64") + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
     print(bashCommand)
     os.system(bashCommand)
     # parse noise values and compute stddev

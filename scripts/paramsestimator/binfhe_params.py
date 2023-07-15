@@ -17,16 +17,13 @@ def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
 
     #bootstrapping technique
-    dist_type = int(input("Enter Bootstrapping technique (0 = GINX, 1 = AP, 2 = LMKDCEY): "))
-    helperfncs.test_range(dist_type, 0, 2)
+    bootstrapping_tech = int(input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKDCEY): "))
+    helperfncs.test_range(bootstrapping_tech, 1, 3)
 
-    secret_dist = int(input("Enter Secret distribution (0 = uniform, 1 = error, 2 = ternary): "))
-    helperfncs.test_range(secret_dist, 0, 2)
+    secret_dist = int(input("Enter Secret distribution (0 = error, 1 = ternary): "))
+    helperfncs.test_range(secret_dist, 0, 1)
 
     exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q): ")
-
-    #is_quantum = int(input("Include quantum attack estimates for security? (0 = False, 1 = True): "))
-    #helperfncs.test_range(is_quantum, 0, 1)
 
     exp_decryption_failure = int(input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate): "))
 
@@ -45,10 +42,8 @@ def parameter_selector():
         is_quantum = False
 
     if (secret_dist == 0):
-        secret_dist_des = "uniform"
-    elif (secret_dist == 1):
         secret_dist_des = "error"
-    elif (secret_dist == 2):
+    elif (secret_dist == 1):
         secret_dist_des = "ternary"
 
     #set ptmod based on num of inputs
@@ -164,7 +159,10 @@ def parameter_selector():
             print("gadget digit base B_g: ", B_g)
             print("key switching digit base B_ks: ", optB_ks)
             print("Performance: ", perf)
-
+            command_arg = "-n " + opt_n + " -q " + modulus_q + " -N " + ringsize_N + " -Q " 
+                                + logmodQ + " -k " + optQks + " -g " + B_g + " -b " + optB_ks
+                                + " -t " + bootstrapping_tech + " -d " + secret_dist + " -r 32 -s 3.19 -i 1000"
+            print("commandline arguments: ", command_arg)
 
 #add d_ks to the function
 def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params):
@@ -254,6 +252,8 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
 
     return opt_n, optlogmodQks, optBks
 
+#This function is no longer used -- was initially an attempt to search 
+#through optimal Qks for every n, very slow to do it while also optimizing for n
 def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params):
     n = 0
 
