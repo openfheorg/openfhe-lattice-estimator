@@ -184,7 +184,7 @@ def parameter_selector():
             print("gadget digit base B_g: ", B_g)
             print("key switching digit base B_ks: ", optB_ks)
             print("Performance: ", perf)
-            command_arg = "-n " + opt_n + " -q " + modulus_q + " -N " + ringsize_N + " -Q " + logmodQ + " -k " + optQks + " -g " + B_g + " -b " + optB_ks + " -t " + bootstrapping_tech + " -d " + secret_dist + " -r 32 -s 3.19 -i 1000"
+            command_arg = "-n " + str(opt_n) + " -q " + str(modulus_q) + " -N " + str(ringsize_N) + " -Q " + str(logmodQ) + " -k " + str(optQks) + " -g " + str(B_g) + " -b " + str(optB_ks) + " -t " + str(bootstrapping_tech) + " -d " + str(secret_dist) + " -r 32 -s 3.19 -i 1000"
             print("commandline arguments: ", command_arg)
 
 #add d_ks to the function
