@@ -158,6 +158,7 @@ def get_noise_from_cpp_code(param_set, num_of_samples, perfNumbers = False):
 
     bashCommand = ""
 
+    # todo: change build folder based on word size
     if mod_logQ <32:
         bashCommand = "scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + "build" + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
     else:

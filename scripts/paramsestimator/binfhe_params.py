@@ -19,22 +19,45 @@ def parameter_selector():
 
     #bootstrapping technique
     bootstrapping_tech = int(input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKDCEY): "))
-    helperfncs.test_range(bootstrapping_tech, 1, 3)
+    # setting default in case of wrong or no input
+    if (not bootstrapping_tech):
+        bootstrapping_tech = 2
+
 
     secret_dist = int(input("Enter Secret distribution (0 = error, 1 = ternary): "))
-    helperfncs.test_range(secret_dist, 0, 1)
+    # setting default in case of wrong or no input
+    if ((secret_dist == 0) or (secret_dist == 1)):
+        secret_dist = 1
 
-    exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q): ")
+    exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128Q]: ")
+    # setting default in case of wrong or no input
+    if (not exp_sec_level):
+        exp_sec_level = "STD128Q"
 
-    exp_decryption_failure = int(input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate): "))
+    exp_decryption_failure = int(input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: "))
+    # setting default in case of wrong or no input
+    if (not exp_decryption_failure):
+        exp_decryption_failure = -32
 
-    num_of_inputs = int(input("Enter expected number of inputs to the boolean gate: "))
+    num_of_inputs = int(input("Enter expected number of inputs to the boolean gate [default = 2]: "))
+    # setting default in case of wrong or no input
+    if (not num_of_inputs):
+        num_of_inputs = 2
 
-    num_of_samples = int(input("Enter expected number of samples to estimate noise: "))
+    num_of_samples = int(input("Enter expected number of samples to estimate noise [default = 150]: "))
+    # setting default in case of wrong or no input
+    if (not num_of_samples):
+        num_of_samples = 150
 
-    d_ks = int(input("Enter key switching digit size: "))
+    d_ks = int(input("Enter key switching digit size [default = 2, 3, or 4]: "))
+    # setting default in case of wrong or no input
+    if (not d_ks):
+        d_ks = 4
 
-    num_threads = int(input("Enter number of threads that can be used to run the lattice-estimator: "))
+    num_threads = int(input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): "))
+    # setting default in case of wrong or no input
+    if (not num_threads):
+        num_threads = 1
 
     #processing parameters based on the inputs
     if (exp_sec_level[-1] == "Q"):
