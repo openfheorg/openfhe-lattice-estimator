@@ -26,7 +26,7 @@ def parameter_selector():
 
     secret_dist = int(input("Enter Secret distribution (0 = error, 1 = ternary): "))
     # setting default in case of wrong or no input
-    if ((secret_dist == 0) or (secret_dist == 1)):
+    if ((secret_dist != 0) and (secret_dist != 1)):
         secret_dist = 1
 
     exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128Q]: ")

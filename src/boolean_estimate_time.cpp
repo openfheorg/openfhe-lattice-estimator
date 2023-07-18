@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
               << " " << dim_n << " " << dim_N << " " << logQ << " " << ctmodq << " " << Qks << " " << B_g << " " << B_ks
               << std::endl;
     std::cout << "parameters from commandline secret_dist, bootstrapping technique: "
-              << " " <<  << " " << secret_dist << " " <<  bootstrapping_technique
+              << secret_dist << " " <<  bootstrapping_technique
               << std::endl;
     
     BINFHE_METHOD bt;

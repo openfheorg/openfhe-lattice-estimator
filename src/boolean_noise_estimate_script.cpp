@@ -171,7 +171,7 @@ int main(int argc, char* argv[]) {
               << std::endl;
 
     std::cout << "parameters from commandline secret_dist, bootstrapping technique: "
-              << " " <<  << " " << secret_dist << " " <<  bootstrapping_technique
+              << secret_dist << " " <<  bootstrapping_technique
               << std::endl;
               
     BINFHE_METHOD bt;
