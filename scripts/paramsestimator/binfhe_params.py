@@ -12,6 +12,7 @@ Measure bootstrap keygen/evalbingate time, and throughput (bootstrap keygen size
 import paramstable as stdparams
 import binfhe_params_helper as helperfncs
 from math import log2, floor, sqrt, ceil
+import os
 
 def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
@@ -100,10 +101,10 @@ def parameter_selector():
                 B_g = 2**ceil(logmodQ/d_g)
                 B_ks = 2**ceil(logmodQks/d_ks)
 
-                while (B_ks >= 128):# or ()32gb limit on complexity:
+                while (B_ks >= 128):
                     B_ks = B_ks/2
                 #create paramset object
-                param_set_opt = stdparams.paramsetvars(lattice_n, modulus_q, ringsize_N, logmodQ, modulus_Qks, B_g, B_ks, B_rk, sigma)
+                param_set_opt = stdparams.paramsetvars(lattice_n, modulus_q, ringsize_N, logmodQ, modulus_Qks, B_g, B_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
 
                 #optimize n, Qks to reduce the noise
                 #compute target noise level for the expected decryption failure rate
@@ -159,9 +160,7 @@ def parameter_selector():
             print("gadget digit base B_g: ", B_g)
             print("key switching digit base B_ks: ", optB_ks)
             print("Performance: ", perf)
-            command_arg = "-n " + opt_n + " -q " + modulus_q + " -N " + ringsize_N + " -Q " 
-                                + logmodQ + " -k " + optQks + " -g " + B_g + " -b " + optB_ks
-                                + " -t " + bootstrapping_tech + " -d " + secret_dist + " -r 32 -s 3.19 -i 1000"
+            command_arg = "-n " + opt_n + " -q " + modulus_q + " -N " + ringsize_N + " -Q " + logmodQ + " -k " + optQks + " -g " + B_g + " -b " + optB_ks + " -t " + bootstrapping_tech + " -d " + secret_dist + " -r 32 -s 3.19 -i 1000"
             print("commandline arguments: ", command_arg)
 
 #add d_ks to the function
@@ -351,4 +350,17 @@ def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_
 
     return n, retlogmodQks, retBks
 
+def rm_out_files(prefix):
+    try:
+        for filename in os.listdir(os.getcwd()):
+            if filename.startswith(prefix):
+                file_path = os.path.join(os.getcwd(), filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+        print("Cleanup completed.")
+    except OSError as e:
+        print(f"Error: {e}")
+
 parameter_selector()
+rm_out_files("out_file_")
+rm_out_files("noise_file_")

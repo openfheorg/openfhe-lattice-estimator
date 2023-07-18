@@ -10,11 +10,12 @@ import io
 from time import sleep
 #import paramstable as stdparams
 import paramstable as stdparams
-sys.path.insert(0, '/home/sara/lattice-estimator')
+
+syspath = "/home/sara/lattice-estimator"
+sys.path.insert(0, syspath)
 from estimator import *
 
 num_threads = 8
-syspath = "/home/sara/scriptparamsbinfhe24may23"
 
 def restore_print():
     # restore stdout
@@ -158,9 +159,9 @@ def get_noise_from_cpp_code(param_set, num_of_samples, perfNumbers = False):
     bashCommand = ""
 
     if mod_logQ <32:
-        bashCommand = syspath + "/scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + str(syspath + "../build32") + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
+        bashCommand = "scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + "build" + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
     else:
-        bashCommand = syspath + "/scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + str(syspath + "../build64") + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
+        bashCommand = "scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + "build" + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
     print(bashCommand)
     os.system(bashCommand)
     # parse noise values and compute stddev

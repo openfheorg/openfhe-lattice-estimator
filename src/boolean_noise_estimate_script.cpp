@@ -34,10 +34,12 @@
  */
 #define PROFILE
 
-#include "openfhe/binfhe/binfhecontext.h"
+#include <type_traits>
+#include "binfhecontext.h"
 #include "utils/sertype.h"
 #include "utils/serial.h"
 #include <getopt.h>
+
 
 using namespace lbcrypto;
 
@@ -218,7 +220,7 @@ int main(int argc, char* argv[]) {
     // Sample Program: Step 4: Evaluation
     TIC(t);
     // 1, 0, 0
-    auto ctAND1 = cc.EvalBinGateThreeInput(AND3, ctvec);
+    auto ctAND1 = cc.EvalBinGate(AND3, ctvec);
     es          = TOC_MS(t);
     std::cout << "EvalBinGateTime: " << es << " milliseconds" << std::endl;
 
@@ -232,7 +234,7 @@ int main(int argc, char* argv[]) {
         ctveci.push_back(ct2);
         ctveci.push_back(ct3);
         // 1, 1, 0
-        auto ctAND2 = cc.EvalBinGateThreeInput(AND3, ctveci);
+        auto ctAND2 = cc.EvalBinGate(AND3, ctveci);
         LWEPlaintext result;
 
         cc.Decrypt(sk, ctAND2, &result, p);

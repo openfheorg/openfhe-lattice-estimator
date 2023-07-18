@@ -218,30 +218,48 @@ int main(int argc, char* argv[]) {
     std::cout << "ciphertext modulus: " << ct1->GetModulus() << std::endl;
     std::cout << "ciphertext dimension n: " << ct1->GetLength() << std::endl;
 
+    std::vector<LWECiphertext> ct123, ct134, ct125, ct346;
+
+    ct123.push_back(ct1);
+    ct123.push_back(ct2);
+    ct123.push_back(ct3);
+
+    ct134.push_back(ct1);
+    ct134.push_back(ct3);
+    ct134.push_back(ct4);
+
+    ct125.push_back(ct1);
+    ct125.push_back(ct2);
+    ct125.push_back(ct5);
+
+    ct346.push_back(ct3);
+    ct346.push_back(ct4);
+    ct346.push_back(ct6);
+
     // Sample Program: Step 4: Evaluation
     TIC(t);
     // 1, 0, 0
-    auto ctAND1 = cc.EvalBinGateThreeInput(AND3, ct1, ct3, ct4);
+    auto ctAND1 = cc.EvalBinGate(AND3, ct134);
 
     // 1, 1, 0
-    auto ctAND2 = cc.EvalBinGateThreeInput(AND3, ct1, ct2, ct3);
+    auto ctAND2 = cc.EvalBinGate(AND3, ct123);
 
     // 1, 1, 1
-    auto ctAND3 = cc.EvalBinGateThreeInput(AND3, ct1, ct2, ct5);
+    auto ctAND3 = cc.EvalBinGate(AND3, ct125);
 
     // 0, 0, 0
-    auto ctAND4 = cc.EvalBinGateThreeInput(AND3, ct3, ct4, ct6);
+    auto ctAND4 = cc.EvalBinGate(AND3, ct346);
 
     // 1, 0, 0
-    auto ctOR1 = cc.EvalBinGateThreeInput(OR3, ct1, ct3, ct4);
+    auto ctOR1 = cc.EvalBinGate(OR3, ct134);
     // 1, 1, 0
-    auto ctOR2 = cc.EvalBinGateThreeInput(OR3, ct1, ct2, ct3);
+    auto ctOR2 = cc.EvalBinGate(OR3, ct123);
 
     // 1, 1, 1
-    auto ctOR3 = cc.EvalBinGateThreeInput(OR3, ct1, ct2, ct5);
+    auto ctOR3 = cc.EvalBinGate(OR3, ct125);
 
     // 1, 1, 1
-    auto ctOR4 = cc.EvalBinGateThreeInput(OR3, ct3, ct4, ct6);
+    auto ctOR4 = cc.EvalBinGate(OR3, ct346);
 
     es = TOC_MS(t);
     std::cout << "time for gate evaluation " << es << " milliseconds" << std::endl;
