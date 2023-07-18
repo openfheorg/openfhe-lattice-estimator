@@ -168,7 +168,8 @@ def parameter_selector():
 
             print("final parameters")
             print("Input parameters: ")
-            print("dist_type: ",dist_type)
+            print("dist_type: ",secret_dist_des)
+            print("bootstrapping_tech: ",bootstrapping_tech)
             print("sec_level: ", exp_sec_level)
             print("expected decryption failure rate: ", exp_decryption_failure)
             print("actual decryption failure rate: ", final_dec_fail_rate)
@@ -380,7 +381,7 @@ def rm_out_files(prefix):
                 file_path = os.path.join(os.getcwd(), filename)
                 if os.path.isfile(file_path):
                     os.remove(file_path)
-        print("Cleanup completed.")
+        print(prefix + " Cleanup completed.")
     except OSError as e:
         print(f"Error: {e}")
 
