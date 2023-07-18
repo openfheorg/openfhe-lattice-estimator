@@ -33,7 +33,7 @@
   Example for the FHEW scheme using the default bootstrapping method (GINX)
  */
 #define PROFILE
-#include "openfhe/binfhe/binfhecontext.h"
+#include "binfhecontext.h"
 #include "utils/sertype.h"
 #include "utils/serial.h"
 #include <getopt.h>
