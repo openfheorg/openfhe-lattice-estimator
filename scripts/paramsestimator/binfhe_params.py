@@ -162,7 +162,7 @@ def parameter_selector():
             optQks = 2**optlogmodQks
             B_g = 2**ceil(logmodQ/d_g)
 
-            param_set_final = stdparams.paramsetvars(opt_n, modulus_q, ringsize_N, logmodQ, optQks, B_g, optB_ks, B_rk, sigma)
+            param_set_final = stdparams.paramsetvars(opt_n, modulus_q, ringsize_N, logmodQ, optQks, B_g, optB_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
             finalnoise, perf = helperfncs.get_noise_from_cpp_code(param_set_final, 1000, True)##########################################################run script CPP###########
             final_dec_fail_rate = helperfncs.get_decryption_failure(finalnoise, ptmod, modulus_q, num_of_inputs)
 
