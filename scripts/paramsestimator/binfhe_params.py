@@ -18,14 +18,19 @@ def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
 
     #bootstrapping technique
-    bootstrapping_tech = int(input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKDCEY): "))
+    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKDCEY): ")
     # setting default in case of wrong or no input
-    if (not bootstrapping_tech):
+    if (not bootstrapping_tech_in):
+        bootstrapping_tech_in = 2
+    bootstrapping_tech = int(bootstrapping_tech_in)
+    if ((bootstrapping_tech != 1) and (bootstrapping_tech != 2) and (bootstrapping_tech != 3)):
         bootstrapping_tech = 2
 
-
-    secret_dist = int(input("Enter Secret distribution (0 = error, 1 = ternary): "))
+    secret_dist_in = input("Enter Secret distribution (0 = error, 1 = ternary): ")
     # setting default in case of wrong or no input
+    if ( not secret_dist_in):
+        secret_dist_in = 1
+    secret_dist = int(secret_dist_in)
     if ((secret_dist != 0) and (secret_dist != 1)):
         secret_dist = 1
 
@@ -34,30 +39,35 @@ def parameter_selector():
     if (not exp_sec_level):
         exp_sec_level = "STD128Q"
 
-    exp_decryption_failure = int(input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: "))
+    exp_decryption_failure_in = input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: ")
     # setting default in case of wrong or no input
-    if (not exp_decryption_failure):
-        exp_decryption_failure = -32
+    if (not exp_decryption_failure_in):
+        exp_decryption_failure_in = -32
+    exp_decryption_failure = int(exp_decryption_failure_in)
 
-    num_of_inputs = int(input("Enter expected number of inputs to the boolean gate [default = 2]: "))
+    num_of_inputs_in = input("Enter expected number of inputs to the boolean gate [default = 2]: ")
     # setting default in case of wrong or no input
-    if (not num_of_inputs):
-        num_of_inputs = 2
+    if (not num_of_inputs_in):
+        num_of_inputs_in = 2
+    num_of_inputs = int(num_of_inputs_in)
 
-    num_of_samples = int(input("Enter expected number of samples to estimate noise [default = 150]: "))
+    num_of_samples_in = input("Enter expected number of samples to estimate noise [default = 150]: ")
     # setting default in case of wrong or no input
-    if (not num_of_samples):
-        num_of_samples = 150
+    if (not num_of_samples_in):
+        num_of_samples_in = 150
+    num_of_samples = int(num_of_samples_in)
 
-    d_ks = int(input("Enter key switching digit size [default = 2, 3, or 4]: "))
+    d_ks_in = input("Enter key switching digit size [default = 2, 3, or 4]: ")
     # setting default in case of wrong or no input
-    if (not d_ks):
-        d_ks = 4
+    if (not d_ks_in):
+        d_ks_in = 4
+    d_ks = int(d_ks_in)
 
-    num_threads = int(input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): "))
+    num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): ")
     # setting default in case of wrong or no input
-    if (not num_threads):
-        num_threads = 1
+    if (not num_threads_in):
+        num_threads_in = 1
+    num_threads = int(num_threads_in)
 
     #processing parameters based on the inputs
     if (exp_sec_level[-1] == "Q"):
@@ -70,6 +80,16 @@ def parameter_selector():
     elif (secret_dist == 1):
         secret_dist_des = "ternary"
 
+    print("Input parameters: ")
+    print("bootstrapping_tech: ",bootstrapping_tech)
+    print("dist_type: ",secret_dist_des)
+    print("sec_level: ", exp_sec_level)
+    print("expected decryption failure rate: ", exp_decryption_failure)
+    print("num_of_inputs: ", num_of_inputs)
+    print("num_of_samples: ", num_of_samples)
+    print("d_ks: ", d_ks)
+    print("num_of_threads: ", num_threads)
+    ########################################################
     #set ptmod based on num of inputs
     ptmod = 2*num_of_inputs
 
@@ -167,7 +187,6 @@ def parameter_selector():
             final_dec_fail_rate = helperfncs.get_decryption_failure(finalnoise, ptmod, modulus_q, num_of_inputs)
 
             print("final parameters")
-            print("Input parameters: ")
             print("dist_type: ",secret_dist_des)
             print("bootstrapping_tech: ",bootstrapping_tech)
             print("sec_level: ", exp_sec_level)
