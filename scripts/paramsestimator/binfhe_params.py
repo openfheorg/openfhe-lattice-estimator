@@ -106,7 +106,7 @@ def parameter_selector():
             loopq2N = False
             while (modulus_q <= 2*ringsize_N):
                 #other variables
-                lattice_n = 500 # for stdnum security, could set to ringsize_N/2 #start with this value and binary search on n to find optimal parameter set
+                lattice_n = 400 # for stdnum security, could set to ringsize_N/2 #start with this value and binary search on n to find optimal parameter set
 
                 logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level) #find analytical estimate for starting point of Qks
                 logmodQu = helperfncs.get_mod(ringsize_N, exp_sec_level)
