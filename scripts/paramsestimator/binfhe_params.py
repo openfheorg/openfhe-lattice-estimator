@@ -61,7 +61,7 @@ def parameter_selector():
     d_ks_in = input("Enter key switching digit size [default = 2, 3, or 4]: ")
     # setting default in case of wrong or no input
     if (not d_ks_in):
-        d_ks_in = 4
+        d_ks_in = 2
     d_ks = int(d_ks_in)
 
     num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): ")
