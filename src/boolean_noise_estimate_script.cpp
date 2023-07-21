@@ -150,6 +150,7 @@ int main(int argc, char* argv[]) {
     paramset.numberBits   = logQ;
     paramset.stdDev       = sigma;
     paramset.latticeParam = dim_n;
+    paramset.numAutoKeys = 10;
     if (secret_dist == 0) {
         paramset.keyDist = GAUSSIAN;
     } else if (secret_dist == 1) {

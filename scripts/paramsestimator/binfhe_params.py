@@ -12,13 +12,14 @@ Measure bootstrap keygen/evalbingate time, and throughput (bootstrap keygen size
 import paramstable as stdparams
 import binfhe_params_helper as helperfncs
 from math import log2, floor, sqrt, ceil
+from sympy import isprime
 import os
 
 def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
 
     #bootstrapping technique
-    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKDCEY): ")
+    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY): ")
     # setting default in case of wrong or no input
     if (not bootstrapping_tech_in):
         bootstrapping_tech_in = 2
@@ -34,10 +35,10 @@ def parameter_selector():
     if ((secret_dist != 0) and (secret_dist != 1)):
         secret_dist = 1
 
-    exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128Q]: ")
+    exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128]: ")
     # setting default in case of wrong or no input
     if (not exp_sec_level):
-        exp_sec_level = "STD128Q"
+        exp_sec_level = "STD128"
 
     exp_decryption_failure_in = input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: ")
     # setting default in case of wrong or no input
@@ -95,6 +96,7 @@ def parameter_selector():
 
     B_rk = 32
     sigma = 3.19
+    d_ks_input = d_ks
 
     for d_g in [2, 3, 4]:
         #Set ringsize n, Qks, N, Q based on the security level
@@ -145,7 +147,13 @@ def parameter_selector():
                 B_ks = 2**ceil(logmodQks/d_ks)
 
                 while (B_ks >= 128):
-                    B_ks = B_ks/2
+                    if not isprime(logmodQks):
+                        while (logmodQks % d_ks):
+                            d_ks += 1
+                    else:
+                        d_ks += 1
+                    B_ks = 2**ceil(logmodQks/d_ks)
+
                 #create paramset object
                 param_set_opt = stdparams.paramsetvars(lattice_n, modulus_q, ringsize_N, logmodQ, modulus_Qks, B_g, B_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
 
@@ -180,6 +188,7 @@ def parameter_selector():
             print("cannot find parameters for d_g: ", d_g)
         else:
             optQks = 2**optlogmodQks
+            optd_ks = optlogmodQks // log2(optB_ks)
             B_g = 2**ceil(logmodQ/d_g)
 
             param_set_final = stdparams.paramsetvars(opt_n, modulus_q, ringsize_N, logmodQ, optQks, B_g, optB_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
@@ -202,6 +211,7 @@ def parameter_selector():
             print("optimal key switching modulus  Qks: ", optQks)
             print("gadget digit base B_g: ", B_g)
             print("key switching digit base B_ks: ", optB_ks)
+            print("key switching digit size B_ks: ", optd_ks)
             print("Performance: ", perf)
             command_arg = "-n " + str(opt_n) + " -q " + str(modulus_q) + " -N " + str(ringsize_N) + " -Q " + str(logmodQ) + " -k " + str(optQks) + " -g " + str(B_g) + " -b " + str(optB_ks) + " -t " + str(bootstrapping_tech) + " -d " + str(secret_dist) + " -r 32 -s 3.19 -i 1000"
             print("commandline arguments: ", command_arg)
@@ -227,7 +237,12 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         params.Qks = 2**logmodQks
         B_ks = 2**ceil(logmodQks/d_ks)
         while (B_ks >= 128):
-            B_ks = B_ks/2
+            if not isprime(logmodQks):
+                while (logmodQks % d_ks):
+                    d_ks += 1
+            else:
+                d_ks += 1
+            B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
         new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples)
@@ -276,9 +291,15 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
 
         params.n = newopt_n
         params.Qks = 2**logmodQks
+
         B_ks = 2**ceil(logmodQks/d_ks)
         while (B_ks >= 128):
-            B_ks = B_ks/2
+            if not isprime(logmodQks):
+                while (logmodQks % d_ks):
+                    d_ks += 1
+            else:
+                d_ks += 1
+            B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
         new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples)
