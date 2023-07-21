@@ -107,6 +107,9 @@ def parameter_selector():
             modulus_q = ringsize_N
             loopq2N = False
             while (modulus_q <= 2*ringsize_N):
+                #reset d_ks to input d_ks for each loop
+                d_ks = d_ks_input
+
                 #other variables
                 lattice_n = 400 # for stdnum security, could set to ringsize_N/2 #start with this value and binary search on n to find optimal parameter set
 
@@ -219,7 +222,9 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
     retlogmodQks = 0
     retBks = 0
     found = False
+    d_ks_reset_loop = d_ks
     while(start_n <= end_N):
+        d_ks = d_ks_reset_loop
         new_n = floor((start_n + end_N)/2)
 
         logmodQks = helperfncs.get_mod(new_n, exp_sec_level)
@@ -270,7 +275,10 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
     opt_n = end_n
     optlogmodQks = log2(params.Qks)
     optBks = params.Bks
+
+    d_ks_reset_loop = d_ks
     while (start_n <= end_n):
+        d_ks = d_ks_reset_loop
         newopt_n = floor((start_n + end_n)/2)
         print("newopt n: ", newopt_n)
 
