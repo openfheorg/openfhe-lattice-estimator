@@ -147,11 +147,7 @@ def parameter_selector():
                 B_ks = 2**ceil(logmodQks/d_ks)
 
                 while (B_ks >= 128):
-                    if not isprime(logmodQks):
-                        while (logmodQks % d_ks):
-                            d_ks += 1
-                    else:
-                        d_ks += 1
+                    d_ks += 1
                     B_ks = 2**ceil(logmodQks/d_ks)
 
                 #create paramset object
@@ -237,11 +233,7 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         params.Qks = 2**logmodQks
         B_ks = 2**ceil(logmodQks/d_ks)
         while (B_ks >= 128):
-            if not isprime(logmodQks):
-                while (logmodQks % d_ks):
-                    d_ks += 1
-            else:
-                d_ks += 1
+            d_ks += 1
             B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
@@ -294,11 +286,7 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
 
         B_ks = 2**ceil(logmodQks/d_ks)
         while (B_ks >= 128):
-            if not isprime(logmodQks):
-                while (logmodQks % d_ks):
-                    d_ks += 1
-            else:
-                d_ks += 1
+            d_ks += 1
             B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
