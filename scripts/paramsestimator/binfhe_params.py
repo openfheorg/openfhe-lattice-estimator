@@ -127,7 +127,7 @@ def parameter_selector():
                     print("initial lattice dimension too small to run the estimator for this security level, increasing initial value")
 
                 while ((dimn == 0) and (modulus_Qks == 0)):
-                    lattice_n = lattice_n + 100
+                    lattice_n = lattice_n + 25
                     logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level)
                     dimn, modulus_Qks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], lattice_n, 2**logmodQksu, secret_dist_des, num_threads, False, True, False, is_quantum)
 
