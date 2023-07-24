@@ -168,26 +168,26 @@ def parameter_selector():
                 else:
                     opt_n = lattice_n
 
-                if (opt_n != 0):
+                if ((opt_n != 0) and (optlogmodQks != 0) and (optB_ks != 0)):
                     break
-                elif ((opt_n == 0) and loopq2N):
+                elif (((opt_n == 0) or (optlogmodQks == 0) or (optB_ks == 0)) and loopq2N):
                     break
                 else:
                     modulus_q = modulus_q*2
                     loopq2N = True
                     print("increasing q to 2N to find parameters optimized for the input")
 
-            if (opt_n != 0):
+            if ((opt_n != 0) and (optlogmodQks != 0) and (optB_ks != 0)):
                 break
             else:
                 ringsize_N = ringsize_N*2
                 print("increasing N to 2048 to find parameters optimized for the input")
 
-        if (opt_n == 0):
+        if ((opt_n == 0) or (optlogmodQks == 0) or (optB_ks == 0)):
             print("cannot find parameters for d_g: ", d_g)
         else:
             optQks = 2**optlogmodQks
-            optd_ks = optlogmodQks // log2(optB_ks)
+            optd_ks = ceil(optlogmodQks/log2(optB_ks))
             B_g = 2**ceil(logmodQ/d_g)
 
             param_set_final = stdparams.paramsetvars(opt_n, modulus_q, ringsize_N, logmodQ, optQks, B_g, optB_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
