@@ -167,6 +167,8 @@ def parameter_selector():
                     opt_n, optlogmodQks, optB_ks = binary_search_n(lattice_n, ringsize_N, actual_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, param_set_opt)#lattice_n, ringsize_N)
                 else:
                     opt_n = lattice_n
+                    optlogmodQks = logmodQks
+                    optB_ks = B_ks
 
                 if ((opt_n != 0) and (optlogmodQks != 0) and (optB_ks != 0)):
                     break
