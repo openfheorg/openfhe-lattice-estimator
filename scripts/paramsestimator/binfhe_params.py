@@ -139,6 +139,10 @@ def parameter_selector():
                 logmodQks = log2(modulus_Qks)
                 logmodQ = log2(modulus_Q)
 
+                #set logQ to 28 for lattice dimension 1024 with LMKCDEY
+                if ((bootstrapping_tech == 3) and (dimN == 1024)):
+                    logmodQ = 28
+                    
                 #this is added since Qks is declared as usint in openfhe
                 if (logmodQks >= 32):
                     logmodQks = 30
