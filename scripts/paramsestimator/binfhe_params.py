@@ -16,10 +16,10 @@ from sympy import isprime
 import os
 
 def parameter_selector():
-    print("Parameter selectorfor FHEW like schemes")
+    print("Parameter selector for FHEW like schemes")
 
     #bootstrapping technique
-    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY): ")
+    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY)[default = 2]: ")
     # setting default in case of wrong or no input
     if (not bootstrapping_tech_in):
         bootstrapping_tech_in = 2
@@ -27,7 +27,7 @@ def parameter_selector():
     if ((bootstrapping_tech != 1) and (bootstrapping_tech != 2) and (bootstrapping_tech != 3)):
         bootstrapping_tech = 2
 
-    secret_dist_in = input("Enter Secret distribution (0 = error, 1 = ternary): ")
+    secret_dist_in = input("Enter Secret distribution (0 = error, 1 = ternary)[default = 1]: ")
     # setting default in case of wrong or no input
     if ( not secret_dist_in):
         secret_dist_in = 1
@@ -211,7 +211,7 @@ def parameter_selector():
             print("Output parameters: ")
             print("lattice dimension n: ", opt_n)
             print("ringsize N: ", ringsize_N)
-            print("lattice modulus: ", modulus_q)
+            print("lattice modulus n: ", modulus_q)
             print("size of ring modulus Q: ", logmodQ)
             print("optimal key switching modulus  Qks: ", optQks)
             print("gadget digit base B_g: ", B_g)
@@ -288,7 +288,6 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
     while (start_n <= end_n):
         d_ks = d_ks_reset_loop
         newopt_n = floor((start_n + end_n)/2)
-        print("newopt n: ", newopt_n)
 
         logmodQks = helperfncs.get_mod(newopt_n, exp_sec_level)
         newopt_n, modQks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], newopt_n, 2**logmodQks, secret_dist_des, num_threads, False, True, False, is_quantum)
