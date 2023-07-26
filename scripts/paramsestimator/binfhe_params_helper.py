@@ -40,10 +40,8 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
     params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
     
     if secret_dist == "error":
-        print("running lattice-estimator with error distribution for secret")
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.DiscreteGaussian(3.19), Xe=ND.DiscreteGaussian(3.19))
     elif secret_dist == "ternary":
-        print("running lattice-estimator with ternary distribution for secret")
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
     else:
         print("Invalid distribution for secret")

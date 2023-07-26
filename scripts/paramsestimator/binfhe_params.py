@@ -234,7 +234,6 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         new_n = floor((start_n + end_N)/2)
 
         logmodQks = helperfncs.get_mod(new_n, exp_sec_level)
-        print("secret dist in binary search func: ", secret_dist_des)
         new_n, modQks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], new_n, 2**logmodQks, secret_dist_des, num_threads, False, True, False, is_quantum)
         logmodQks = log2(modQks)
 
@@ -285,7 +284,6 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
     opt_n = end_n
     optlogmodQks = log2(params.Qks)
     optBks = params.Bks
-    print("secret dist in binary search func: ", secret_dist_des)
     d_ks_reset_loop = d_ks
     while (start_n <= end_n):
         d_ks = d_ks_reset_loop
