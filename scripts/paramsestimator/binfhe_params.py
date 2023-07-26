@@ -15,10 +15,6 @@ from math import log2, floor, sqrt, ceil
 from sympy import isprime
 import os
 
-secret_dist_des = ""
-num_threads = 2
-is_quantum = False
-
 def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
 
@@ -172,7 +168,7 @@ def parameter_selector():
                 actual_noise = helperfncs.get_noise_from_cpp_code(param_set_opt, num_of_samples)##########################################################run script CPP###########
 
                 if (actual_noise > target_noise_level):
-                    opt_n, optlogmodQks, optB_ks = binary_search_n(lattice_n, ringsize_N, actual_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, param_set_opt)#lattice_n, ringsize_N)
+                    opt_n, optlogmodQks, optB_ks = binary_search_n(lattice_n, ringsize_N, actual_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, param_set_opt, secret_dist_des, is_quantum, num_threads)#lattice_n, ringsize_N)
                 else:
                     opt_n = lattice_n
                     optlogmodQks = logmodQks
@@ -226,7 +222,7 @@ def parameter_selector():
             print("commandline arguments: ", command_arg)
 
 #add d_ks to the function
-def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params):
+def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads):
     n = 0
 
     retlogmodQks = 0
@@ -238,6 +234,7 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         new_n = floor((start_n + end_N)/2)
 
         logmodQks = helperfncs.get_mod(new_n, exp_sec_level)
+        print("secret dist in binary search func: ", secret_dist_des)
         new_n, modQks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], new_n, 2**logmodQks, secret_dist_des, num_threads, False, True, False, is_quantum)
         logmodQks = log2(modQks)
 
@@ -280,15 +277,15 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
     if ((found) and (new_n < prev_n)):
         params.Qks = 2**retlogmodQks
         params.Bks = retBks
-        n, retlogmodQks, retBks = find_opt_n(new_n, prev_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params)
+        n, retlogmodQks, retBks = find_opt_n(new_n, prev_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads)
 
     return n, retlogmodQks, retBks
 
-def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params):
+def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads):
     opt_n = end_n
     optlogmodQks = log2(params.Qks)
     optBks = params.Bks
-
+    print("secret dist in binary search func: ", secret_dist_des)
     d_ks_reset_loop = d_ks
     while (start_n <= end_n):
         d_ks = d_ks_reset_loop
