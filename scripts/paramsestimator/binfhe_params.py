@@ -15,6 +15,10 @@ from math import log2, floor, sqrt, ceil
 from sympy import isprime
 import os
 
+secret_dist_des = ""
+num_threads = 2
+is_quantum = False
+
 def parameter_selector():
     print("Parameter selectorfor FHEW like schemes")
 
@@ -234,6 +238,9 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         new_n = floor((start_n + end_N)/2)
 
         logmodQks = helperfncs.get_mod(new_n, exp_sec_level)
+        new_n, modQks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], new_n, 2**logmodQks, secret_dist_des, num_threads, False, True, False, is_quantum)
+        logmodQks = log2(modQks)
+
         if (logmodQks >= 32):
             logmodQks = 30
 
@@ -289,6 +296,9 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
         print("newopt n: ", newopt_n)
 
         logmodQks = helperfncs.get_mod(newopt_n, exp_sec_level)
+        newopt_n, modQks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], newopt_n, 2**logmodQks, secret_dist_des, num_threads, False, True, False, is_quantum)
+        logmodQks = log2(modQks)
+
         if (logmodQks >= 32):
             logmodQks = 30
 
@@ -427,6 +437,9 @@ def rm_out_files(prefix):
     except OSError as e:
         print(f"Error: {e}")
 
+#logmod = helperfncs.get_mod(481, "STD128")
+#dim, mod = helperfncs.optimize_params_security(stdparams.paramlinear["STD128"][0], 481, 2**logmod, "error", 2, False, True, False, False)
+#print("dim, mod: ", dim, log2(mod))
 parameter_selector()
 rm_out_files("out_file_")
 rm_out_files("noise_file_")

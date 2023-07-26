@@ -15,8 +15,6 @@ syspath = "/home/sara/lattice-estimator"
 sys.path.insert(0, syspath)
 from estimator import *
 
-num_threads = 8
-
 def restore_print():
     # restore stdout
     sys.stdout = sys.__stdout__
@@ -40,11 +38,12 @@ def get_mod(dim, exp_sec_level):
 def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum = True):
     #ternary_uniform_1m1 = dim//3;
     params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
-    if secret_dist == "uniform":
-        params = LWE.Parameters(n=dim, q=mod, Xs=ND.UniformMod(mod), Xe=ND.DiscreteGaussian(3.19))
-    elif secret_dist == "error":
+    
+    if secret_dist == "error":
+        print("running lattice-estimator with error distribution for secret")
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.DiscreteGaussian(3.19), Xe=ND.DiscreteGaussian(3.19))
     elif secret_dist == "ternary":
+        print("running lattice-estimator with ternary distribution for secret")
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
     else:
         print("Invalid distribution for secret")
