@@ -29,33 +29,31 @@ Parameter selector for FHEW like schemes
 Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY): 2
 Enter Secret distribution (0 = error, 1 = ternary): 1
 Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128]: 
-Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: -35
+Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: -37
 Enter expected number of inputs to the boolean gate [default = 2]: 
 Enter expected number of samples to estimate noise [default = 150]: 
-Enter key switching digit size [default = 2, 3, or 4]: 
+Enter key switching digit size [default = 2, 3, or 4]: 3
 Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): 8
 Input parameters: 
 bootstrapping_tech:  2
 dist_type:  ternary
 sec_level:  STD128
-expected decryption failure rate:  -35
+expected decryption failure rate:  -37
 num_of_inputs:  2
 num_of_samples:  150
 d_ks:  2
 num_of_threads:  8
-d_g loop:  2
-Target noise for this iteration:  13.608357619852871
-scripts/run_script.sh 400 1024 1024 27.0 1024.0 16384 32 32 3.19 150 1 2 build > out_file_404 2>noise_file_404
 ...
 ```
 > sample output:
 ```
+d_g loop:  2
 final parameters
 dist_type:  ternary
 bootstrapping_tech:  2
 sec_level:  STD128
-expected decryption failure rate:  -35
-actual decryption failure rate:  -84.32982216679146
+expected decryption failure rate:  -37
+actual decryption failure rate:  -72.25964982938888
 num_of_inputs:  2
 num_of_samples:  150
 Output parameters: 
@@ -67,7 +65,49 @@ optimal key switching modulus  Qks:  16384.0
 gadget digit base B_g:  134217728
 key switching digit base B_ks:  32
 key switching digit size B_ks:  3
-Performance:  {'BootstrapKeyGenTime': ' 1098 milliseconds\n', 'BootstrappingKeySize': ' 68065309\n bytes', 'KeySwitchingKeySize': ' 820543525\n bytes', 'CiphertextSize': ' 4189\n bytes', 'EvalBinGateTime': ' 188 milliseconds\n'}
+Performance:  {'BootstrapKeyGenTime': ' 1071 milliseconds\n', 'BootstrappingKeySize': ' 68065309\n bytes', 'KeySwitchingKeySize': ' 820543525\n bytes', 'CiphertextSize': ' 4189\n bytes', 'EvalBinGateTime': ' 197 milliseconds\n'}
 commandline arguments:  -n 518 -q 2048 -N 2048 -Q 54.0 -k 16384.0 -g 134217728 -b 32 -t 2 -d 1 -r 32 -s 3.19 -i 1000
+...
+d_g loop:  3
+final parameters
+dist_type:  ternary
+bootstrapping_tech:  2
+sec_level:  STD128
+expected decryption failure rate:  -37
+actual decryption failure rate:  -62.2296386723353
+num_of_inputs:  2
+num_of_samples:  150
+Output parameters: 
+lattice dimension n:  518
+ringsize N:  1024
+lattice modulus n:  1024
+size of ring modulus Q:  27.0
+optimal key switching modulus  Qks:  16384.0
+gadget digit base B_g:  512
+key switching digit base B_ks:  32
+key switching digit size B_ks:  3
+Performance:  {'BootstrapKeyGenTime': ' 559 milliseconds\n', 'BootstrappingKeySize': ' 68218637\n bytes', 'KeySwitchingKeySize': ' 410271781\n bytes', 'CiphertextSize': ' 4189\n bytes', 'EvalBinGateTime': ' 112 milliseconds\n'}
+commandline arguments:  -n 518 -q 1024 -N 1024 -Q 27.0 -k 16384.0 -g 512 -b 32 -t 2 -d 1 -r 32 -s 3.19 -i 1000
+...
+d_g loop:  4
+final parameters
+dist_type:  ternary
+bootstrapping_tech:  2
+sec_level:  STD128
+expected decryption failure rate:  -37
+actual decryption failure rate:  -34.60273103257841
+num_of_inputs:  2
+num_of_samples:  150
+Output parameters: 
+lattice dimension n:  516
+ringsize N:  1024
+lattice modulus n:  1024
+size of ring modulus Q:  27.0
+optimal key switching modulus  Qks:  8192.0
+gadget digit base B_g:  128
+key switching digit base B_ks:  32
+key switching digit size B_ks:  3
+Performance:  {'BootstrapKeyGenTime': ' 574 milliseconds\n', 'BootstrappingKeySize': ' 101924557\n bytes', 'KeySwitchingKeySize': ' 408698917\n bytes', 'CiphertextSize': ' 4173\n bytes', 'EvalBinGateTime': ' 178 milliseconds\n'}
+commandline arguments:  -n 516 -q 1024 -N 1024 -Q 27.0 -k 8192.0 -g 128 -b 32 -t 2 -d 1 -r 32 -s 3.19 -i 1000
 ```
-The commandline arguments printed out by the script can be run with the `boolean_estimate_time.cpp` executable to get more accurate runtimes.
+Note that the output is provided for digit sizes 2, 3, 4 as indicated by the line `d_g loop: ` in the sample. The digit size influences the performance runtime and the noise level (which consequently affects the decryption failure rate). From the output parameters for different digit sizes, you can choose the one with the best performance. In the above sample output, this would be for digit size 3. The performance with 32 bits native word size is always better than 64 bits and we upper bound the size of the modulus to 28 bits to use 32 bit native word. The input parameter key switching digit size d_ks influences the bootstrapping keygen time (in generating the internal key switching key), key switching key size and the noise level. A higher value of d_ks results in slower keygen time and larger key size but smaller noise. The commandline arguments printed out by the script can be run with the `boolean_estimate_time.cpp` executable to get more accurate runtimes.
