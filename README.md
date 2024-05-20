@@ -5,6 +5,7 @@ Pre-requisites:
 1. git clone the lattice-estimator repository (`git clone https://github.com/malb/lattice-estimator.git`)
 2. Install python with `sudo apt install python3` (tested with 3.8.10)
 3. Install sage with `sudo apt install sagemath` (tested with SageMath version 9.0)
+4. Install `numpy` and `scipy` using `pip3 install` 
 
 Steps to run the script:
 1. Clone the [openfhe-development](https://github.com/openfheorg/openfhe-development) repository and checkout the `dev` branch.
