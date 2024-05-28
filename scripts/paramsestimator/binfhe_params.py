@@ -190,7 +190,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
 
 
             print("table entry: ", ', '.join(( str(int(logmodQ)), str(2*ringsize_N), str(opt_n), str(modulus_q), str(int(optQks)), str(sigma),
-                  str(optB_ks), str(B_g), str(B_rk), str(10), ('GAUSSIAN', 'UNIFORM_TERNARY')[bootstrapping_tech])))
+                  str(optB_ks), str(B_g), str(B_rk), str(10), ('GAUSSIAN', 'UNIFORM_TERNARY')[secret_dist])))
 
 
 # add d_ks to the function
