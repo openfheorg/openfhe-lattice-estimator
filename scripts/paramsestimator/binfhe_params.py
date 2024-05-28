@@ -1,76 +1,27 @@
 #!/usr/bin/python
 
-'''Approach for determining parameters for binfhe
-1) Pick bootstrapping method
-2) Pick secret distribution
-3) Pick security level
-4) Set expected decryption failure rate
-5) Specify max number of inputs to a boolean gate
-Measure bootstrap keygen/evalbingate time, and throughput (bootstrap keygen size, keyswitching key size, ciphertext size) and document.
+'''
+usage (1): Without arguments then answer the prompts.
+    > python3 scripts/paramsestimator/binfhe_params.py
+
+usage (2): With any of {t, d, p, f, I, i, k, n} arguments to bypass the prompts. Argument explanations at the bottom of this file.
+    > python3 scripts/paramsestimator/binfhe_params.py -t 2 -p STD128 -I 2 -f -32
+
+usage (3): with the --all flag to iterate through all valid combinations of {t, p, I, d} arguments.
+    > python3 scripts/paramsestimator/binfhe_params.py --all -f -40 -i 1000 -n 16
 '''
 
-import paramstable as stdparams
-import binfhe_params_helper as helperfncs
+from itertools import product
 from math import log2, floor, sqrt, ceil
-from sympy import isprime
+
+import argparse
+import binfhe_params_helper as helperfncs
+import paramstable as stdparams
 import os
+import sys
 
-def parameter_selector():
-    print("Parameter selector for FHEW like schemes")
-
-    #bootstrapping technique
-    bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY)[default = 2]: ")
-    # setting default in case of wrong or no input
-    if (not bootstrapping_tech_in):
-        bootstrapping_tech_in = 2
-    bootstrapping_tech = int(bootstrapping_tech_in)
-    if ((bootstrapping_tech != 1) and (bootstrapping_tech != 2) and (bootstrapping_tech != 3)):
-        bootstrapping_tech = 2
-
-    secret_dist_in = input("Enter Secret distribution (0 = error, 1 = ternary)[default = 1]: ")
-    # setting default in case of wrong or no input
-    if ( not secret_dist_in):
-        secret_dist_in = 1
-    secret_dist = int(secret_dist_in)
-    if ((secret_dist != 0) and (secret_dist != 1)):
-        secret_dist = 1
-
-    exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128]: ")
-    # setting default in case of wrong or no input
-    if (not exp_sec_level):
-        exp_sec_level = "STD128"
-
-    exp_decryption_failure_in = input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate)[default = -32]: ")
-    # setting default in case of wrong or no input
-    if (not exp_decryption_failure_in):
-        exp_decryption_failure_in = -32
-    exp_decryption_failure = int(exp_decryption_failure_in)
-
-    num_of_inputs_in = input("Enter expected number of inputs to the boolean gate [default = 2]: ")
-    # setting default in case of wrong or no input
-    if (not num_of_inputs_in):
-        num_of_inputs_in = 2
-    num_of_inputs = int(num_of_inputs_in)
-
-    num_of_samples_in = input("Enter expected number of samples to estimate noise [default = 150]: ")
-    # setting default in case of wrong or no input
-    if (not num_of_samples_in):
-        num_of_samples_in = 150
-    num_of_samples = int(num_of_samples_in)
-
-    d_ks_in = input("Enter key switching digit size [default = 2, 3, or 4]: ")
-    # setting default in case of wrong or no input
-    if (not d_ks_in):
-        d_ks_in = 2
-    d_ks = int(d_ks_in)
-
-    num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator): ")
-    # setting default in case of wrong or no input
-    if (not num_threads_in):
-        num_threads_in = 1
-    num_threads = int(num_threads_in)
-
-    #processing parameters based on the inputs
+def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, num_threads):
+    # processing parameters based on the inputs
     if (exp_sec_level[-1] == "Q"):
         is_quantum = True
     else:
@@ -90,8 +41,9 @@ def parameter_selector():
     print("num_of_samples: ", num_of_samples)
     print("d_ks: ", d_ks)
     print("num_of_threads: ", num_threads)
+
     ########################################################
-    #set ptmod based on num of inputs
+    # set ptmod based on num of inputs
     ptmod = 2*num_of_inputs
 
     B_rk = 32
@@ -99,7 +51,7 @@ def parameter_selector():
     d_ks_input = d_ks
 
     for d_g in [2, 3, 4]:
-        #Set ringsize n, Qks, N, Q based on the security level
+        # Set ringsize n, Qks, N, Q based on the security level
         print("d_g loop: ", d_g)
         ringsize_N = 1024
         opt_n = 0
@@ -107,16 +59,17 @@ def parameter_selector():
             modulus_q = ringsize_N
             loopq2N = False
             while (modulus_q <= 2*ringsize_N):
-                #reset d_ks to input d_ks for each loop
                 d_ks = d_ks_input
 
-                #other variables
-                lattice_n = 400 # for stdnum security, could set to ringsize_N/2 #start with this value and binary search on n to find optimal parameter set
+                # for stdnum security, could set to ringsize_N/2
+                # start with this value and binary search on n to find optimal parameter set
+                lattice_n = 400
 
-                logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level) #find analytical estimate for starting point of Qks
+                # find analytical estimate for starting point of Qks
+                logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level)
                 logmodQu = helperfncs.get_mod(ringsize_N, exp_sec_level)
 
-                #check security by running the estimator and adjust modulus if needed
+                # check security by running the estimator and adjust modulus if needed
                 dimn, modulus_Qks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], lattice_n, 2**logmodQksu, secret_dist_des, num_threads, False, True, False, is_quantum)
                 dimN, modulus_Q = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], ringsize_N, 2**logmodQu, secret_dist_des, num_threads, False, True, False, is_quantum)
 
@@ -131,7 +84,7 @@ def parameter_selector():
                     logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level)
                     dimn, modulus_Qks = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], lattice_n, 2**logmodQksu, secret_dist_des, num_threads, False, True, False, is_quantum)
 
-                #check again
+                # check again
                 if ((dimn > dimN) or (dimn == 0) or (modulus_Qks == 0)):
                     print("starting lattice dimension is 0 or greater than large N")
                     break
@@ -139,11 +92,11 @@ def parameter_selector():
                 logmodQks = log2(modulus_Qks)
                 logmodQ = log2(modulus_Q)
 
-                #set logQ upperbound to 28 for lattice dimension 1024
+                # set logQ upperbound to 28 for lattice dimension 1024
                 if ((dimN == 1024) and (logmodQ >=29)):
                     logmodQ = 28
-                    
-                #this is added since Qks is declared as usint in openfhe
+
+                # this is added since Qks is declared as usint in openfhe
                 if (logmodQks >= 32):
                     logmodQks = 30
                 while(logmodQks > logmodQ):
@@ -157,18 +110,18 @@ def parameter_selector():
                     d_ks += 1
                     B_ks = 2**ceil(logmodQks/d_ks)
 
-                #create paramset object
+                # create paramset object
                 param_set_opt = stdparams.paramsetvars(lattice_n, modulus_q, ringsize_N, logmodQ, modulus_Qks, B_g, B_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
 
-                #optimize n, Qks to reduce the noise
-                #compute target noise level for the expected decryption failure rate
+                # optimize n, Qks to reduce the noise
+                # compute target noise level for the expected decryption failure rate
                 target_noise_level = helperfncs.get_target_noise(exp_decryption_failure, ptmod, modulus_q, num_of_inputs)
                 print("Target noise for this iteration: ", target_noise_level)
 
-                actual_noise = helperfncs.get_noise_from_cpp_code(param_set_opt, num_of_samples)##########################################################run script CPP###########
+                actual_noise = helperfncs.get_noise_from_cpp_code(param_set_opt, num_of_samples, num_of_inputs)
 
                 if (actual_noise > target_noise_level):
-                    opt_n, optlogmodQks, optB_ks = binary_search_n(lattice_n, ringsize_N, actual_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, param_set_opt, secret_dist_des, is_quantum, num_threads)#lattice_n, ringsize_N)
+                    opt_n, optlogmodQks, optB_ks = binary_search_n(lattice_n, ringsize_N, actual_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, param_set_opt, secret_dist_des, is_quantum, num_threads, num_of_inputs)
                 else:
                     opt_n = lattice_n
                     optlogmodQks = logmodQks
@@ -197,7 +150,7 @@ def parameter_selector():
             B_g = 2**ceil(logmodQ/d_g)
 
             param_set_final = stdparams.paramsetvars(opt_n, modulus_q, ringsize_N, logmodQ, optQks, B_g, optB_ks, B_rk, sigma, secret_dist, bootstrapping_tech)
-            finalnoise, perf = helperfncs.get_noise_from_cpp_code(param_set_final, 1000, True)##########################################################run script CPP###########
+            finalnoise, perf = helperfncs.get_noise_from_cpp_code(param_set_final, 1000, num_of_inputs, True)
             final_dec_fail_rate = helperfncs.get_decryption_failure(finalnoise, ptmod, modulus_q, num_of_inputs)
 
             print("final parameters")
@@ -218,11 +171,30 @@ def parameter_selector():
             print("key switching digit base B_ks: ", optB_ks)
             print("key switching digit size B_ks: ", optd_ks)
             print("Performance: ", perf)
-            command_arg = "-n " + str(opt_n) + " -q " + str(modulus_q) + " -N " + str(ringsize_N) + " -Q " + str(logmodQ) + " -k " + str(optQks) + " -g " + str(B_g) + " -b " + str(optB_ks) + " -t " + str(bootstrapping_tech) + " -d " + str(secret_dist) + " -r 32 -s 3.19 -i 1000"
+
+            command_arg = ' '.join([ "-n " + str(opt_n),
+                                     "-N " + str(ringsize_N),
+                                     "-q " + str(modulus_q),
+                                     "-Q " + str(int(logmodQ)),
+                                     "-k " + str(int(optQks)),
+                                     "-g " + str(B_g),
+                                     "-r " + str(B_rk),
+                                     "-b " + str(optB_ks),
+                                     "-s " + str(sigma),
+                                     "-t " + str(bootstrapping_tech),
+                                     "-d " + str(secret_dist),
+                                     "-I " + str(num_of_inputs),
+                                     "-i " + str(num_of_samples),
+                                   ])
             print("commandline arguments: ", command_arg)
 
-#add d_ks to the function
-def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads):
+
+            print("table entry: ", ', '.join(( str(int(logmodQ)), str(2*ringsize_N), str(opt_n), str(modulus_q), str(int(optQks)), str(sigma),
+                  str(optB_ks), str(B_g), str(B_rk), str(10), ('GAUSSIAN', 'UNIFORM_TERNARY')[bootstrapping_tech])))
+
+
+# add d_ks to the function
+def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads, num_of_inputs):
     n = 0
 
     retlogmodQks = 0
@@ -251,7 +223,7 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
             B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
-        new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples)
+        new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples, num_of_inputs)
 
         if (new_noise > target_noise_level and prev_noise <= target_noise_level):
             found = True
@@ -272,15 +244,15 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         prevlogmodQks = logmodQks
         prevBks = B_ks
 
-    #add code to check if any n value lesser than the obtained n could result in the same or lower noise level
+    # add code to check if any n value lesser than the obtained n could result in the same or lower noise level
     if ((found) and (new_n < prev_n)):
         params.Qks = 2**retlogmodQks
         params.Bks = retBks
-        n, retlogmodQks, retBks = find_opt_n(new_n, prev_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads)
+        n, retlogmodQks, retBks = find_opt_n(new_n, prev_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads, num_of_inputs)
 
     return n, retlogmodQks, retBks
 
-def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads):
+def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads, num_of_inputs):
     opt_n = end_n
     optlogmodQks = log2(params.Qks)
     optBks = params.Bks
@@ -308,7 +280,7 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
             B_ks = 2**ceil(logmodQks/d_ks)
 
         params.B_ks = B_ks
-        new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples)
+        new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples, num_of_inputs)
 
         if (new_noise < target_noise_level):
             opt_n = newopt_n
@@ -321,9 +293,9 @@ def find_opt_n(start_n, end_n, exp_sec_level, target_noise_level, num_of_samples
 
     return opt_n, optlogmodQks, optBks
 
-#This function is no longer used -- was initially an attempt to search 
-#through optimal Qks for every n, very slow to do it while also optimizing for n
-def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params):
+# This function is no longer used -- was initially an attempt to search
+# through optimal Qks for every n, very slow to do it while also optimizing for n
+def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, num_of_inputs):
     n = 0
 
     retlogmodQks = 0
@@ -350,7 +322,7 @@ def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_
         endlogQks = logmodQks
 
         newlogmodQks = startlogQks
-        #newlogmodQks = log2(startQks)
+        # newlogmodQks = log2(startQks)
 
         found = False
         while(startlogQks <= endlogQks):
@@ -360,9 +332,9 @@ def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_
                 B_ks = B_ks/2     # display in the final parameters if the d_ks value is different from input
 
             params.B_ks = B_ks
-            new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples)
+            new_noise = helperfncs.get_noise_from_cpp_code(params, num_of_samples, num_of_inputs)
 
-            #if (new_noise > target_noise_level and prev_noise <= target_noise_level):
+            # if (new_noise > target_noise_level and prev_noise <= target_noise_level):
             if (new_noise <= target_noise_level):
                 print("in qks search break if")
                 found = True
@@ -415,25 +387,99 @@ def binary_search_n_Qks(start_n, end_N, prev_noise, exp_sec_level, target_noise_
             retBks = intBks
 
 
-    #add code to check if any n value lesser than the obtained n could result in the same or lower noise level
-    #if (new_noise > target_noise_level and prev_noise <= target_noise_level):
+    # add code to check if any n value lesser than the obtained n could result in the same or lower noise level
+    # if (new_noise > target_noise_level and prev_noise <= target_noise_level):
 
     return n, retlogmodQks, retBks
 
-def rm_out_files(prefix):
-    try:
-        for filename in os.listdir(os.getcwd()):
-            if filename.startswith(prefix):
-                file_path = os.path.join(os.getcwd(), filename)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-        print(prefix + " Cleanup completed.")
-    except OSError as e:
-        print(f"Error: {e}")
 
-#logmod = helperfncs.get_mod(481, "STD128")
-#dim, mod = helperfncs.optimize_params_security(stdparams.paramlinear["STD128"][0], 481, 2**logmod, "error", 2, False, True, False, False)
-#print("dim, mod: ", dim, log2(mod))
-parameter_selector()
-rm_out_files("out_file_")
-rm_out_files("noise_file_")
+if __name__ == '__main__':
+    if (len(sys.argv) == 1):
+        '''
+        Approach for determining parameters for binfhe
+        1) Pick bootstrapping method
+        2) Pick secret distribution
+        3) Pick security level
+        4) Set expected decryption failure rate
+        5) Specify max number of inputs to a boolean gate
+        Measure bootstrap keygen/evalbingate time, and throughput (bootstrap keygen size, keyswitching key size, ciphertext size) and document.
+        '''
+
+        print("Parameter selector for FHEW like schemes")
+
+        bootstrapping_tech_in = input("Enter Bootstrapping technique (1 = AP, 2 = GINX, 3 = LMKCDEY) [default = 2]: ")
+        if (not bootstrapping_tech_in):
+            bootstrapping_tech_in = 2
+        bootstrapping_tech = int(bootstrapping_tech_in)
+        if ((bootstrapping_tech != 1) and (bootstrapping_tech != 2) and (bootstrapping_tech != 3)):
+            bootstrapping_tech = 2
+
+        secret_dist_in = input("Enter Secret distribution (0 = error, 1 = ternary) [default = 1]: ")
+        if ( not secret_dist_in):
+            secret_dist_in = 1
+        secret_dist = int(secret_dist_in)
+        if ((secret_dist != 0) and (secret_dist != 1)):
+            secret_dist = 1
+
+        exp_sec_level = input("Enter Security level (STD128, STD128Q, STD192, STD192Q, STD256, STD256Q) [default = STD128]: ")
+        if (not exp_sec_level):
+            exp_sec_level = "STD128"
+
+        exp_decryption_failure_in = input("Enter expected decryption failure rate (for example, enter -32 for 2^-32 failure rate) [default = -40]: ")
+        if (not exp_decryption_failure_in):
+            exp_decryption_failure_in = -40
+        exp_decryption_failure = int(exp_decryption_failure_in)
+
+        num_of_inputs_in = input("Enter expected number of inputs to the boolean gate (2, 3, or 4) [default = 2]: ")
+        if (not num_of_inputs_in):
+            num_of_inputs_in = 2
+        num_of_inputs = int(num_of_inputs_in)
+
+        num_of_samples_in = input("Enter expected number of samples to estimate noise [default = 200]: ")
+        if (not num_of_samples_in):
+            num_of_samples_in = 200
+        num_of_samples = int(num_of_samples_in)
+
+        d_ks_in = input("Enter key switching digit size (2, 3, or 4) [default = 3]: ")
+        if (not d_ks_in):
+            d_ks_in = 3
+        d_ks = int(d_ks_in)
+
+        num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator) [default = 1]: ")
+        if (not num_threads_in):
+            num_threads_in = 1
+        num_threads = int(num_threads_in)
+        parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, num_threads)
+    else:
+        sec_levels  = ('STD128', 'STD128Q', 'STD192', 'STD192Q', 'STD256', 'STD256Q')
+        boot_techs  = { 1 : "AP", 2 : "GINX", 3 : "LMKCDEY" }
+        gate_inputs = (2, 3, 4)
+
+        parser = argparse.ArgumentParser(prog='binfhe_params')
+        parser.add_argument('-t', '--bootstrapping_tech', action='store', choices=boot_techs.keys(), default=2, type=int)
+        parser.add_argument('-d', '--secret_dist', choices=(0, 1), action='store', default=1, type=int)
+        parser.add_argument('-p', '--exp_sec_level', action='store', choices=sec_levels, default='STD128')
+        parser.add_argument('-f', '--exp_decryption_failure', action='store', default=-40, type=int)
+        parser.add_argument('-I', '--num_of_inputs', action='store', choices=gate_inputs, default=2, type=int)
+        parser.add_argument('-i', '--num_of_samples', action='store', default=200, type=int)
+        parser.add_argument('-k', '--d_ks', action='store', choices=(2, 3, 4), default=3, type=int)
+        parser.add_argument('-n', '--num_threads', action='store', default=1, type=int)
+        parser.add_argument('-a', '--all', action='store_true')
+        a = parser.parse_args()
+
+        if a.all:
+            for sl, gi, bt in product(sec_levels, gate_inputs, boot_techs.keys()):
+                print('_'.join((sl, str(gi), boot_techs[bt])), '##########################################################################################\n')
+
+                secret_dist = 0 if (bt == 3) else 1
+                parameter_selector(bt, secret_dist, sl, a.exp_decryption_failure, gi, a.num_of_samples, a.d_ks, a.num_threads)
+
+                helperfncs.rm_out_files("out_file_")
+                helperfncs.rm_out_files("noise_file_")
+
+                print('_'.join((sl, str(gi), boot_techs[bt])), '##########################################################################################\n')
+        else:
+            parameter_selector(a.bootstrapping_tech, a.secret_dist, a.exp_sec_level, a.exp_decryption_failure, a.num_of_inputs, a.num_of_samples, a.d_ks, a.num_threads)
+
+    helperfncs.rm_out_files("out_file_")
+    helperfncs.rm_out_files("noise_file_")

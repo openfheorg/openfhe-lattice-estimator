@@ -66,4 +66,5 @@ def generate_dim_mod(exp_sec_level, ringdim, secret_dist, num_threads, is_dim_po
     dim, mod = helperfncs.optimize_params_security(stdparams.paramlinear[exp_sec_level][0], ringdim, 2**logmod, secret_dist, num_threads, False, True, is_dim_pow2, is_quantum)
 
     return dim, mod
+
 parameter_selector()
