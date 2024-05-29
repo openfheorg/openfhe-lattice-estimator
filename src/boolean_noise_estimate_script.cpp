@@ -288,6 +288,7 @@ int main(int argc, char* argv[]) {
 
     TIC(t);
     LWEPlaintext result;
+    auto fcnt = 0;
     for (uint32_t i = 0; i < num_of_runs; ++i) {
         for (auto&& ct : cts)
             ct = cc.Encrypt(sk, 0, SMALL_DIM, p);
@@ -296,12 +297,13 @@ int main(int argc, char* argv[]) {
 
         cc.Decrypt(sk, ct, &result, p);
 
-        // if (result != 0)
-        //     OPENFHE_THROW(math_error, "decryption failure");
+        if (result != 0)
+            ++fcnt;
 
     }
     std::cout << "EvalBinGateTime: " << (TOC_MS(t)/num_of_runs) << " milliseconds" << std::endl;
     std::cout << "Gate: " << gate << std::endl;
+    std::cout << "Failures: " << fcnt << std::endl;
     std::cout << "ctmodq: " << cc.GetParams()->GetLWEParams()->Getq() << std::endl;
 
     return 0;
