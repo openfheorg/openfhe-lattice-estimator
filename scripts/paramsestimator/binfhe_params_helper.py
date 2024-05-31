@@ -1,18 +1,15 @@
 #!/usr/bin/python
 
+from estimator import *
 from math import log2, floor, sqrt, ceil, erfc
 from scipy.special import erfcinv
 from statistics import stdev
+
+import io
+import os
+import paramstable as stdparams
 import random
 import sys
-import os
-import io
-#from time import sleep
-import paramstable as stdparams
-
-syspath = "/home/cpascoe/ops5g/lattice-estimator"
-sys.path.insert(0, syspath)
-from estimator import *
 
 def restore_print():
     # restore stdout
@@ -33,7 +30,7 @@ def get_mod(dim, exp_sec_level):
     mod = ceil(modapp)
     return mod
 
-# calls the lattice-estimator to get the work factor for known attacks; currently only for ternary secrets.
+# calls lattice-estimator to get the work factor for known attacks
 # TODO: add other secret distributions
 def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum = True):
     params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
@@ -62,7 +59,8 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
 
     return min(usvprop, dualrop, decrop)
 
-# optimize dim, mod for an expected security level - this is specifically for the dimension n, and key switch modulus Qks in FHEW. Increasing Qks helps reduce the bootstrapped noise
+# optimize dim, mod for an expected security level - this is specifically for the dimension n, and key switch modulus Qks in FHEW
+# Increasing Qks helps reduce the bootstrapped noise
 def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, optimize_dim=False, optimize_mod=True, is_dim_pow2=True, is_quantum = True):
     dim1 = dim
     dimlog = log2(dim)

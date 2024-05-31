@@ -7,8 +7,8 @@ usage (1): Without arguments then answer the prompts.
 usage (2): With any of {t, d, p, f, I, i, k, n} arguments to bypass the prompts. Argument explanations at the bottom of this file.
     > python3 scripts/paramsestimator/binfhe_params.py -t 2 -p STD128 -I 2 -f -32
 
-usage (3): with the --all flag to iterate through all valid combinations of {t, p, I, d} arguments.
-    > python3 scripts/paramsestimator/binfhe_params.py --all -f -40 -i 1000 -n 16
+usage (3): with the --all flag to iterate through all valid combinations of {p, I, d} arguments for a given t argument.
+    > python3 scripts/paramsestimator/binfhe_params.py --all -t 3 -f -30 -i 800 -n 16
 '''
 
 from itertools import product
@@ -468,7 +468,8 @@ if __name__ == '__main__':
         a = parser.parse_args()
 
         if a.all:
-            for sl, gi, bt in product(sec_levels, gate_inputs, boot_techs.keys()):
+#            for sl, gi, bt in product(sec_levels, gate_inputs, boot_techs.keys()):
+            for sl, gi, bt in product(sec_levels, gate_inputs, [a.bootstrapping_tech,]):
                 print('_'.join((sl, str(gi), boot_techs[bt])), '##########################################################################################\n')
 
                 secret_dist = 0 if (bt == 3) else 1
