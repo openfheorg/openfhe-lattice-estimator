@@ -20,7 +20,7 @@ import paramstable as stdparams
 import os
 import sys
 
-def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, num_threads):
+def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, lower, upper, num_threads):
     # processing parameters based on the inputs
     if (exp_sec_level[-1] == "Q"):
         is_quantum = True
@@ -50,7 +50,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
     sigma = 3.19
     d_ks_input = d_ks
 
-    for d_g in [2, 3, 4]:
+    for d_g in range(lower, upper + 1):
         # Set ringsize n, Qks, N, Q based on the security level
         print("d_g loop: ", d_g)
         ringsize_N = 1024
@@ -184,7 +184,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
                                      "-t " + str(bootstrapping_tech),
                                      "-d " + str(secret_dist),
                                      "-I " + str(num_of_inputs),
-                                     "-i " + str(num_of_samples),
+                                     "-i 1000",
                                    ])
             print("commandline arguments: ", command_arg)
 
@@ -445,11 +445,21 @@ if __name__ == '__main__':
             d_ks_in = 3
         d_ks = int(d_ks_in)
 
+        lower_in = input("Enter lower bound for digit decomposition digits [default = 2]: ")
+        if (not lower_in):
+            lower_in = 2
+        lower = int(lower_in)
+
+        upper_in = input("Enter upper bound for digit decomposition digits [default = 4]: ")
+        if (not upper_in):
+            upper_in = 2
+        upper = int(upper_in)
+
         num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator) [default = 1]: ")
         if (not num_threads_in):
             num_threads_in = 1
         num_threads = int(num_threads_in)
-        parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, num_threads)
+        parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, lower, upper, num_threads)
     else:
         sec_levels  = ('STD128', 'STD128Q', 'STD192', 'STD192Q', 'STD256', 'STD256Q')
         boot_techs  = { 1 : "AP", 2 : "GINX", 3 : "LMKCDEY" }
@@ -463,24 +473,25 @@ if __name__ == '__main__':
         parser.add_argument('-I', '--num_of_inputs', action='store', choices=gate_inputs, default=2, type=int)
         parser.add_argument('-i', '--num_of_samples', action='store', default=200, type=int)
         parser.add_argument('-k', '--d_ks', action='store', choices=(2, 3, 4), default=3, type=int)
+        parser.add_argument('-l', '--lower', action='store', default=2, type=int)
+        parser.add_argument('-u', '--upper', action='store', default=4, type=int)
         parser.add_argument('-n', '--num_threads', action='store', default=1, type=int)
         parser.add_argument('-a', '--all', action='store_true')
         a = parser.parse_args()
 
         if a.all:
-#            for sl, gi, bt in product(sec_levels, gate_inputs, boot_techs.keys()):
             for sl, gi, bt in product(sec_levels, gate_inputs, [a.bootstrapping_tech,]):
                 print('_'.join((sl, str(gi), boot_techs[bt])), '##########################################################################################\n')
 
                 secret_dist = 0 if (bt == 3) else 1
-                parameter_selector(bt, secret_dist, sl, a.exp_decryption_failure, gi, a.num_of_samples, a.d_ks, a.num_threads)
+                parameter_selector(bt, secret_dist, sl, a.exp_decryption_failure, gi, a.num_of_samples, a.d_ks, a.lower, a.upper, a.num_threads)
 
                 helperfncs.rm_out_files("out_file_")
                 helperfncs.rm_out_files("noise_file_")
 
                 print('_'.join((sl, str(gi), boot_techs[bt])), '##########################################################################################\n')
         else:
-            parameter_selector(a.bootstrapping_tech, a.secret_dist, a.exp_sec_level, a.exp_decryption_failure, a.num_of_inputs, a.num_of_samples, a.d_ks, a.num_threads)
+            parameter_selector(a.bootstrapping_tech, a.secret_dist, a.exp_sec_level, a.exp_decryption_failure, a.num_of_inputs, a.num_of_samples, a.d_ks, a.lower, a.upper, a.num_threads)
 
     helperfncs.rm_out_files("out_file_")
     helperfncs.rm_out_files("noise_file_")
