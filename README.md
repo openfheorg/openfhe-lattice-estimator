@@ -53,7 +53,7 @@ num_of_inputs:  2
 num_of_samples:  200
 d_ks:  3
 d_g lower bound:  2
-d_g upper bound:  2
+d_g upper bound:  4
 num_of_threads:  8
 command args:  -t 3 -d 0 -p STD128Q -f -40 -I 2 -i 200 -k 3 -l 2 -u 4 -n 8
 ```
