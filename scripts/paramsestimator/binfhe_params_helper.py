@@ -33,8 +33,6 @@ def get_mod(dim, exp_sec_level):
 # calls lattice-estimator to get the work factor for known attacks
 # TODO: add other secret distributions
 def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum = True):
-    params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
-
     if secret_dist == "error":
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.DiscreteGaussian(3.19), Xe=ND.DiscreteGaussian(3.19))
     elif secret_dist == "ternary":
@@ -42,16 +40,10 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
     else:
         print("Invalid distribution for secret")
 
-    if is_quantum:
-        block_print()
-        estimateval = LWE.estimate(params, red_cost_model=RC.LaaMosPol14, deny_list=[
-                               "bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
-        restore_print()
-    else:
-        block_print()
-        estimateval = LWE.estimate(params, red_cost_model=RC.BDGL16, deny_list=[
-                               "bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
-        restore_print()
+    block_print()
+    estimateval = LWE.estimate(params, red_cost_model=(RC.LaaMosPol14 if is_quantum else RC.BDGL16),
+                               deny_list=["bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
+    restore_print()
 
     usvprop = floor(log2(estimateval['usvp']['rop']))
     dualrop = floor(log2(estimateval['dual']['rop']))
@@ -61,7 +53,7 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
 
 # optimize dim, mod for an expected security level - this is specifically for the dimension n, and key switch modulus Qks in FHEW
 # Increasing Qks helps reduce the bootstrapped noise
-def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, optimize_dim=False, optimize_mod=True, is_dim_pow2=True, is_quantum = True):
+def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, optimize_dim = False, optimize_mod = True, is_dim_pow2 = True, is_quantum = True):
     dim1 = dim
     dimlog = log2(dim)
     done = False
@@ -71,8 +63,7 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
             sec_level_from_estimator = call_estimator(dim, mod, secret_dist, num_threads, is_quantum)
             done = True
         except:
-            mod = mod*2
-            pass
+            mod = 2*mod
     done = False
     mod1 = mod
 
@@ -82,7 +73,7 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
     while (sec_level_from_estimator < expected_sec_level or done):
         if (optimize_dim and (not optimize_mod)):
             modifieddim = True
-            dim1 = dim1+15
+            dim1 = dim1 + 15
             if ((dim1 >= 2*dim) and (not is_dim_pow2)):
                 done = True
             elif is_dim_pow2:
@@ -107,14 +98,14 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
         prev_sec_estimator = sec_level_from_estimator_new
         if (optimize_dim and (not optimize_mod)):
             modifieddimmore = True
-            dim1 = dim1-15
+            dim1 = dim1 - 15
             if ((dim1 <= 500) and (not is_dim_pow2)):
                 done = True
             elif is_dim_pow2:
                 dim1 = dim/2
             sec_level_from_estimator_new = call_estimator(dim1, mod, secret_dist, num_threads, is_quantum)
         elif ((not optimize_dim) and optimize_mod):
-            mod1 = mod1*2
+            mod1 = 2*mod1
             try:
                 sec_level_from_estimator_new = call_estimator(dim, mod1, secret_dist, num_threads, is_quantum)
                 modifiedmodmore = True

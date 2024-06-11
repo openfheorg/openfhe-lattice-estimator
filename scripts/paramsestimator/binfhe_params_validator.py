@@ -20,10 +20,17 @@ import os
 import random
 import sys
 
-PARAM_SETS = [ "TOY", "MEDIUM", "STD128_LMKCDEY", "STD128_AP", "STD128", "STD192", "STD256",
-               "STD128Q", "STD128Q_LMKCDEY", "STD192Q", "STD256Q", "STD128_3", "STD128_3_LMKCDEY",
-               "STD128Q_3", "STD128Q_3_LMKCDEY", "STD192Q_3", "STD256Q_3", "STD128_4",
-               "STD128_4_LMKCDEY", "STD128Q_4", "STD128Q_4_LMKCDEY", "STD192Q_4", "STD256Q_4", "SIGNED_MOD_TEST" ]
+PARAM_SETS = [ "TOY", "MEDIUM", "STD128_AP",
+               "STD128", "STD128_3", "STD128_4", "STD128Q", "STD128Q_3", "STD128Q_4",
+               "STD192", "STD192_3", "STD192_4", "STD192Q", "STD192Q_3", "STD192Q_4",
+               "STD256", "STD256_3", "STD256_4", "STD256Q", "STD256Q_3", "STD256Q_4",
+               "STD128_LMKCDEY", "STD128_3_LMKCDEY", "STD128_4_LMKCDEY",
+               "STD128Q_LMKCDEY", "STD128Q_3_LMKCDEY", "STD128Q_4_LMKCDEY",
+               "STD192_LMKCDEY", "STD192_3_LMKCDEY", "STD192_4_LMKCDEY",
+               "STD192Q_LMKCDEY", "STD192Q_3_LMKCDEY",
+               "STD256_LMKCDEY", "STD256Q_LMKCDEY",
+               "LPF_STD128", "LPF_STD128Q", "LPF_STD128_LMKCDEY", "LPF_STD128Q_LMKCDEY",
+               "SIGNED_MOD_TEST" ]
 BOOT_TECHS = { 1 : "AP", 2 : "GINX", 3 : "LMKCDEY" }
 
 def validator2(param_set, boot_tech, num_input, num_iters):
@@ -36,14 +43,16 @@ def validator2(param_set, boot_tech, num_input, num_iters):
         noise_stdev = stdev([float(line.rstrip()) for line in file])
 
     with open("out_file_" + filenamerandom) as file:
-        ctmodq = int([line[7:] for line in file if line[:7] == "ctmodq:"][0])
+        ofdict = {d[0]: d[1] for d in [line.split(' ', 1) for line in file] if len(d) == 2}
 
+    ctmodq = int(ofdict["ctmodq:"].strip().split(' ')[0])
     num = ctmodq/(4*num_input)
     denom = sqrt(2*num_input)*noise_stdev
     val = erfc(num/denom)
     failures = 0 if (val == 0) else log2(val)
+    gtime = int(ofdict["EvalBinGateTime:"].strip().split(' ')[0])
 
-    print((param_set, BOOT_TECHS[boot_tech], num_input, num_iters), (noise_stdev, failures))
+    print((param_set, BOOT_TECHS[boot_tech], num_input, num_iters), (noise_stdev, failures, str(gtime) + 'ms'))
 
 def validator(dim_n, mod_q, dim_N, mod_logQ, mod_Qks, B_g, B_ks, B_rk, sigma, num_iters, secret_dist, boot_tech, num_input):
     filenamerandom = str(random.randrange(500))
@@ -56,14 +65,16 @@ def validator(dim_n, mod_q, dim_N, mod_logQ, mod_Qks, B_g, B_ks, B_rk, sigma, nu
         noise_stdev = stdev([float(line.rstrip()) for line in file])
 
     with open("out_file_" + filenamerandom) as file:
-        ctmodq = int([line[7:] for line in file if line[:7] == "ctmodq:"][0])
+        ofdict = {d[0]: d[1] for d in [line.split(' ', 1) for line in file] if len(d) == 2}
 
+    ctmodq = int(ofdict["ctmodq:"].strip().split(' ')[0])
     num = ctmodq/(4*num_input)
     denom = sqrt(2*num_input)*noise_stdev
     val = erfc(num/denom)
     failures = 0 if (val == 0) else log2(val)
+    gtime = int(ofdict["EvalBinGateTime:"].strip().split(' ')[0])
 
-    print(bashCommand, (noise_stdev, failures))
+    print(bashCommand, (noise_stdev, failures, str(gtime) + 'ms'))
 
 
 if __name__ == '__main__':
@@ -88,7 +99,7 @@ if __name__ == '__main__':
     a = parser.parse_args()
 
     if (a.param_set):
-        print(("PARAM_SET", "BOOT_TECH", "NUM_INPUTS", "NUM_ITERS"), ("noise_stdev", "failure_rate"))
+        print(("PARAM_SET", "BOOT_TECH", "NUM_INPUTS", "NUM_ITERS"), ("noise_stdev", "failure_rate", "EvalBinGateTime"))
         if (a.param_set in PARAM_SETS):
             validator2(a.param_set, a.boot_tech, a.num_input, a.num_iters)
         elif (a.param_set == "ALL"):
