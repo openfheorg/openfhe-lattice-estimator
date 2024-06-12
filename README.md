@@ -167,9 +167,9 @@ for LMKCDEY.
 
 To calculate noise std deviation and probability of failure for a specific named BINFHE_PARAMSET within OpenFHE, execute binfhe_params_validator.py with the appropriate set of {p, t, I, i} arguments e.g.,
 ```
-python3 scripts/paramsestimator/binfhe_params_validator.py -p STD128_4_LMKCDEY -t 3 -I 4 -i 1000
+python3 scripts/paramsestimator/binfhe_params_validator.py -p STD128_4 -t 2 -I 4 -i 1000
 ```
-for 1000 iterations of 4-input LMKCDEY at STD128.
+for 1000 iterations of 4-input GINX at STD128.
 
 To calculate noise std deviation and probability of failure for all named BINFHE_PARAMSET within OpenFHE, execute binfhe_params_validator.py with -p ALL e.g.,
 ```
