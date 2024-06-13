@@ -1,19 +1,15 @@
 #!/usr/bin/python
 
+from estimator import *
 from math import log2, floor, sqrt, ceil, erfc
 from scipy.special import erfcinv
 from statistics import stdev
+
+import io
+import os
+import paramstable as stdparams
 import random
 import sys
-import os
-import io
-from time import sleep
-#import paramstable as stdparams
-import paramstable as stdparams
-
-syspath = "/home/sara/lattice-estimator"
-sys.path.insert(0, syspath)
-from estimator import *
 
 def restore_print():
     # restore stdout
@@ -24,9 +20,9 @@ def block_print():
     text_trap = io.StringIO()
     sys.stdout = text_trap
 
-#find analytical estimate for starting point of modulus for the estimator
+# find analytical estimate for starting point of modulus for the estimator
 def get_mod(dim, exp_sec_level):
-    #get linear relation coefficients for log(modulus) and dimension for the input security level
+    # get linear relation coefficients for log(modulus) and dimension for the input security level
     a = stdparams.paramlinear[exp_sec_level][1]
     b = stdparams.paramlinear[exp_sec_level][2]
 
@@ -34,11 +30,9 @@ def get_mod(dim, exp_sec_level):
     mod = ceil(modapp)
     return mod
 
-#calls the lattice-estimator to get the work factor for known attacks; currently only for ternary secrets. todo later: add other secret distributions
+# calls lattice-estimator to get the work factor for known attacks
+# TODO: add other secret distributions
 def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum = True):
-    #ternary_uniform_1m1 = dim//3;
-    params = LWE.Parameters(n=dim, q=mod, Xs=ND.Uniform(-1, 1, dim), Xe=ND.DiscreteGaussian(3.19))
-    
     if secret_dist == "error":
         params = LWE.Parameters(n=dim, q=mod, Xs=ND.DiscreteGaussian(3.19), Xe=ND.DiscreteGaussian(3.19))
     elif secret_dist == "ternary":
@@ -46,16 +40,10 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
     else:
         print("Invalid distribution for secret")
 
-    if is_quantum:
-        block_print()
-        estimateval = LWE.estimate(params, red_cost_model=RC.LaaMosPol14, deny_list=[
-                               "bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
-        restore_print()
-    else:
-        block_print()
-        estimateval = LWE.estimate(params, red_cost_model=RC.BDGL16, deny_list=[
-                               "bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
-        restore_print()
+    block_print()
+    estimateval = LWE.estimate(params, red_cost_model=(RC.LaaMosPol14 if is_quantum else RC.BDGL16),
+                               deny_list=["bkw", "bdd_hybrid", "bdd_mitm_hybrid", "dual_hybrid", "dual_mitm_hybrid", "arora-gb"], jobs=num_threads)
+    restore_print()
 
     usvprop = floor(log2(estimateval['usvp']['rop']))
     dualrop = floor(log2(estimateval['dual']['rop']))
@@ -63,11 +51,11 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
 
     return min(usvprop, dualrop, decrop)
 
-#optimize dim, mod for an expected security level - this is specifically for the dimension n, and key switch modulus Qks in FHEW. Increasing Qks helps reduce the bootstrapped noise
-def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, optimize_dim=False, optimize_mod=True, is_dim_pow2=True, is_quantum = True):
+# optimize dim, mod for an expected security level - this is specifically for the dimension n, and key switch modulus Qks in FHEW
+# Increasing Qks helps reduce the bootstrapped noise
+def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, optimize_dim = False, optimize_mod = True, is_dim_pow2 = True, is_quantum = True):
     dim1 = dim
     dimlog = log2(dim)
-    #sec_level_from_estimator = call_estimator(dim, mod, num_threads, is_quantum)
     done = False
 
     while done is False:
@@ -75,18 +63,17 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
             sec_level_from_estimator = call_estimator(dim, mod, secret_dist, num_threads, is_quantum)
             done = True
         except:
-            mod = mod*2
-            pass
+            mod = 2*mod
     done = False
     mod1 = mod
 
     modifieddim = False
     modifiedmod = False
-    #loop to adjust modulus if given dim, modulus provide less security than target
+    # loop to adjust modulus if given dim, modulus provide less security than target
     while (sec_level_from_estimator < expected_sec_level or done):
         if (optimize_dim and (not optimize_mod)):
             modifieddim = True
-            dim1 = dim1+15
+            dim1 = dim1 + 15
             if ((dim1 >= 2*dim) and (not is_dim_pow2)):
                 done = True
             elif is_dim_pow2:
@@ -100,8 +87,8 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
             except:
                 return 0, 0
 
-    #also need to check if starting from a lower than possible mod - when the above condition is satisfied but not optimal
-    #loop to adjust modulus if given dim, modulus provide more security than target
+    # also need to check if starting from a lower than possible mod - when the above condition is satisfied but not optimal
+    # loop to adjust modulus if given dim, modulus provide more security than target
     prev_sec_estimator = sec_level_from_estimator
     sec_level_from_estimator_new = sec_level_from_estimator
     prev_mod = mod1
@@ -111,14 +98,14 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
         prev_sec_estimator = sec_level_from_estimator_new
         if (optimize_dim and (not optimize_mod)):
             modifieddimmore = True
-            dim1 = dim1-15
+            dim1 = dim1 - 15
             if ((dim1 <= 500) and (not is_dim_pow2)):
                 done = True
             elif is_dim_pow2:
                 dim1 = dim/2
             sec_level_from_estimator_new = call_estimator(dim1, mod, secret_dist, num_threads, is_quantum)
         elif ((not optimize_dim) and optimize_mod):
-            mod1 = mod1*2
+            mod1 = 2*mod1
             try:
                 sec_level_from_estimator_new = call_estimator(dim, mod1, secret_dist, num_threads, is_quantum)
                 modifiedmodmore = True
@@ -137,45 +124,43 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
 
     return dim1, mod1
 
-def get_noise_from_cpp_code(param_set, num_of_samples, perfNumbers = False):
+def get_noise_from_cpp_code(param_set, num_of_samples, num_of_inputs, perfNumbers = False):
+    filenamerandom = str(random.randrange(500))
 
-    filenamerandom = random.randrange(500)
+    # TODO: change build folder based on word size
+    bashCommand = ' '.join([ "scripts/run_script.sh",
+                             str(param_set.n),
+                             str(param_set.q),
+                             str(param_set.N),
+                             str(param_set.logQ),
+                             str(param_set.Qks),
+                             str(param_set.B_g),
+                             str(param_set.B_ks),
+                             str(param_set.B_rk),
+                             str(param_set.sigma),
+                             str(num_of_samples),
+                             str(param_set.secret_dist),
+                             str(param_set.bootstrapping_tech),
+                             str(num_of_inputs),
+                             "build",
+                             "> out_file_" + filenamerandom,
+                             "2> noise_file_" + filenamerandom
+                          ])
 
-    dim_n = param_set.n #n
-    mod_q = param_set.q #mod_q
-    mod_logQ = param_set.logQ  #mod_Q numberBits
-    dim_N = param_set.N  # cyclOrder/2
-    mod_Qks = param_set.Qks #Qks modKS
-    B_g = param_set.B_g #gadgetBase
-    B_ks = param_set.B_ks #baseKS
-    B_rk = param_set.B_rk #baseRK
-    sigma = param_set.sigma #sigma stddev
-    secret_dist = param_set.secret_dist #secret distribution used
-    bootstrapping_tech = param_set.bootstrapping_tech #bootstrapping technique used
-
-    bashCommand = ""
-
-    # todo: change build folder based on word size
-    if mod_logQ <32:
-        bashCommand = "scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + "build" + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
-    else:
-        bashCommand = "scripts/run_script.sh " + str(dim_n) + " " + str(mod_q)+ " " + str(dim_N) + " " + str(mod_logQ)+ " " + str(mod_Qks) + " " + str(B_g) + " " + str(B_ks) + " " + str(B_rk) + " " + str(sigma) + " " + str(num_of_samples) + " " + str(secret_dist) + " " + str(bootstrapping_tech) + " " + "build" + " > out_file_" + str(filenamerandom) + " 2>noise_file_" + str(filenamerandom)
     print(bashCommand)
     os.system(bashCommand)
-    # parse noise values and compute stddev
-    noise=[]
-    with open("noise_file_"+str(filenamerandom)) as file:
-        for line in file:
-            noise.append(float(line.rstrip()))
 
-    perfnum = get_performance("out_file_"+ str(filenamerandom))
+    # parse noise values and compute stddev
+    with open("noise_file_" + filenamerandom) as file:
+        noise = [float(line.rstrip()) for line in file]
+
     if perfNumbers:
-        return stdev(noise), perfnum
+        return stdev(noise), get_performance("out_file_" + filenamerandom)
     else:
         return stdev(noise)
 
 def get_performance(filename):
-    #stdparams.performanceNumbers(bootstrapKeySize, keyswitchKeySize, ciphertextSize, bootstrapKeygenTime, evalbingateTime)
+    # stdparams.performanceNumbers(bootstrapKeySize, keyswitchKeySize, ciphertextSize, bootstrapKeygenTime, evalbingateTime)
     perf = {}
     with open(filename) as file:
         for line in file:
@@ -193,8 +178,6 @@ def get_performance(filename):
                 perf.update({"EvalBinGateTime": s1[1]})
 
     return perf
-
-
 
 def get_decryption_failure(noise_stddev, ptmod, ctmod, comp):
     num = ctmod/(2*ptmod)
@@ -231,3 +214,14 @@ def test_range(val, low, hi):
     else:
         msg = f"input not in valid range ({low} - {hi})"
         raise Exception(msg)
+
+def rm_out_files(prefix):
+    try:
+        for filename in os.listdir(os.getcwd()):
+            if filename.startswith(prefix):
+                file_path = os.path.join(os.getcwd(), filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+        print(prefix + " Cleanup completed.")
+    except OSError as e:
+        print(f"Error: {e}")
