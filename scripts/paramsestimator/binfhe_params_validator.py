@@ -89,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument('-k', '--mod_Qks', action='store', type=int)
     parser.add_argument('-g', '--B_g', action='store', type=int)
     parser.add_argument('-b', '--B_ks', action='store', type=int)
-    parser.add_argument('-r', '--B_rk', action='store', default=32, type=int)
+    parser.add_argument('-r', '--B_rk', action='store', default=64, type=int)
     parser.add_argument('-s', '--sigma', action='store', default=3.19, type=float)
     parser.add_argument('-d', '--secret_dist', choices=(0, 1), action='store', default=1, type=int)
 

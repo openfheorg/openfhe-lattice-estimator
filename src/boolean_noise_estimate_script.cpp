@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     uint32_t logQ                    = 0;
     uint32_t B_g                     = 0;
     uint32_t B_ks                    = 0;
-    uint32_t B_rk                    = 32;
+    uint32_t B_rk                    = 64;
     double sigma                     = 3.19;
     uint32_t bootstrapping_technique = 2;
     uint32_t secret_dist             = 1;

@@ -20,6 +20,9 @@ import paramstable as stdparams
 import os
 import sys
 
+FORCE_q_eq_2N = True
+FORCE_openfhe32 = False
+
 def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, lower, upper, num_threads):
     # processing parameters based on the inputs
     is_quantum = (exp_sec_level[-1] == "Q")
@@ -50,12 +53,10 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
                            ])
     print("command args: ", command_arg)
 
-
     ########################################################
     # set ptmod based on num of inputs
     ptmod = 2*num_of_inputs
 
-    B_rk = 32
     sigma = 3.19
     d_ks_input = d_ks
 
@@ -64,17 +65,18 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
         print("\nd_g loop: ", d_g)
         ringsize_N = 1024
         opt_n = 0
-        while (ringsize_N <= 2048):
-            modulus_q = ringsize_N
+        while (ringsize_N <= (1024 if FORCE_openfhe32 else 2048)):
+            modulus_q = 2*ringsize_N if FORCE_q_eq_2N else ringsize_N
             loopq2N = False
             while (modulus_q <= 2*ringsize_N):
                 print("(q, N): (" + str(modulus_q) + ", " + str(ringsize_N) + ")")
 
                 d_ks = d_ks_input
+                B_rk = 32 if (modulus_q == 1024) else 64
 
                 # for stdnum security, could set to ringsize_N/2
                 # start with this value and binary search on n to find optimal parameter set
-                lattice_n = 300
+                lattice_n = 100
 
                 # find analytical estimate for starting point of Qks
                 logmodQksu = helperfncs.get_mod(lattice_n, exp_sec_level)
@@ -226,7 +228,7 @@ def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_leve
         print("(actual noise, EvalBinGate time) (" +  str(new_noise) + ", " + perf['EvalBinGateTime'].split()[0] + ")")
 
         if (early_exit_tst):
-            if ((new_noise - target_noise_level) > 4):
+            if ((new_noise - target_noise_level) > 8):
                 break
             early_exit_tst = False
             continue
