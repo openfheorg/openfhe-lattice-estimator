@@ -53,12 +53,10 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
                            ])
     print("command args: ", command_arg)
 
-
     ########################################################
     # set ptmod based on num of inputs
     ptmod = 2*num_of_inputs
 
-    B_rk = 64
     sigma = 3.19
     d_ks_input = d_ks
 
@@ -74,6 +72,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
                 print("(q, N): (" + str(modulus_q) + ", " + str(ringsize_N) + ")")
 
                 d_ks = d_ks_input
+                B_rk = 32 if (modulus_q == 1024) else 64
 
                 # for stdnum security, could set to ringsize_N/2
                 # start with this value and binary search on n to find optimal parameter set
