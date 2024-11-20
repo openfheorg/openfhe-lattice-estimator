@@ -10,8 +10,10 @@ A parameter generation tool for DM/FHEW, CGGI/TFHE, and LMKCDEY. The tool takes 
 3. Install `numpy` and `scipy` using `pip3 install`.
 4. Clone the lattice-estimator repository (`git clone https://github.com/malb/lattice-estimator.git`).
 5. Add path for the cloned lattice-estimator directory to your PYTHONPATH environment variable.
-6. Clone the [openfhe-development](https://github.com/openfheorg/openfhe-development) repository and checkout the `dev` branch.
-7. Follow the `Installation` instructions of the openfhe-development README to build and install the library. NOTE: The `WITH_NOISE_DEBUG` flag must be set to `ON` while running cmake (e.g., `cmake -DWITH_NOISE_DEBUG=ON ..`) for propper integration with openfhe-lattice-estimator scripts.
+6. Clone the [openfhe-development](https://github.com/openfheorg/openfhe-development) repository and checkout the `main` branch.
+7. Follow the `Installation` instructions of the openfhe-development README to build and install the library.
+
+   **NOTE: The `WITH_NOISE_DEBUG` flag must be set to `ON` while running cmake (e.g., `cmake -DWITH_NOISE_DEBUG=ON ..`) for propper integration with openfhe-lattice-estimator scripts.**
 
 ## Installation
 
