@@ -40,31 +40,35 @@
 
 using namespace lbcrypto;
 
-usint dim_n  = 0;
-int64_t Qks  = 0;
-usint dim_N  = 0;
-usint ctmodq = 0;
-usint logQ   = 0;
-usint B_g    = 0;
-usint B_ks   = 0;
-usint B_rk   = 32;
-usint sigma  = 3.19;
-usint bootstrapping_technique = 0;
-usint secret_dist = 0;
+uint32_t dim_n  = 0;
+int64_t Qks     = 0;
+uint32_t dim_N  = 0;
+uint32_t ctmodq = 0;
+uint32_t logQ   = 0;
+uint32_t B_g    = 0;
+uint32_t B_ks   = 0;
+uint32_t B_rk   = 32;
+double sigma    = 3.19;
+uint32_t bootstrapping_technique = 0;
+uint32_t secret_dist = 0;
 
-void usage() {
-    std::cout << "-n Lattice Dimension"
-              << "-N Ring dimension"
-              << "-q ct modulus"
-              << "-Q size of ring modulus"
-              << "-k Size of kew switching mod Qks"
-              << "-g Digit base B_g"
-              << "-r Refreshing key base B_rk"
-              << "-b Key switching base B_ks"
-              << "-s sigma (standard deviation)" 
-              << "-t Bootstrapping technique" 
-              << "-d Secret key distribution" << std::endl;
+inline std::string usage() {
+    return std::string("\n\nusage: \n"
+                       "  -n lattice dimension\n"
+                       "  -N ring dimension\n"
+                       "  -q ct modulus\n"
+                       "  -Q size of ring modulus\n"
+                       "  -k size of key switching mod Qks\n"
+                       "  -g digit base B_g\n"
+                       "  -r refreshing key base B_rk\n"
+                       "  -b key switching base B_ks\n"
+                       "  -s sigma (standard deviation)\n"
+                       "  -t bootstrapping technique\n"
+                       "  -d secret key distribution\n"
+                       "  -h display this message\n"
+                     );
 }
+
 int main(int argc, char* argv[]) {
     // Sample Program: Step 1: Set CryptoContext
     TimeVar t;
@@ -124,9 +128,8 @@ int main(int argc, char* argv[]) {
                 secret_dist = atoi(optarg);
                 break;
             case 'h':
-                usage();
             default:
-                return false;
+                OPENFHE_THROW(usage());
         }
     }
 
@@ -147,7 +150,7 @@ int main(int argc, char* argv[]) {
     } else if (secret_dist == 1) {
         paramset.keyDist = UNIFORM_TERNARY;
     } else {
-        OPENFHE_THROW(not_available_error, "Invalid Secret Key distribution");
+        OPENFHE_THROW("Invalid Secret Key distribution");
     }
 
     // ********************
@@ -163,7 +166,7 @@ int main(int argc, char* argv[]) {
     std::cout << "parameters from commandline secret_dist, bootstrapping technique: "
               << secret_dist << " " <<  bootstrapping_technique
               << std::endl;
-    
+
     BINFHE_METHOD bt;
     if (bootstrapping_technique == 1) {
         bt = AP;
@@ -172,7 +175,7 @@ int main(int argc, char* argv[]) {
     } else if (bootstrapping_technique == 3) {
         bt = LMKCDEY;
     } else {
-        OPENFHE_THROW(not_available_error, "Invalid bootstrapping technique");
+        OPENFHE_THROW("Invalid bootstrapping technique");
     }
     cc.GenerateBinFHEContext(paramset, bt);
 
@@ -273,42 +276,42 @@ int main(int argc, char* argv[]) {
     cc.Decrypt(sk, ctAND1, &result, p);
     std::cout << "Result of encrypted computation of AND(1, 0, 0) = " << result << std::endl;
     if (result != 0)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctAND2, &result, p);
     std::cout << "Result of encrypted computation of AND(1, 1, 0) = " << result << std::endl;
     if (result != 0)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctAND3, &result, p);
     std::cout << "Result of encrypted computation of AND(1, 1, 1) = " << result << std::endl;
     if (result != 1)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctAND4, &result, p);
     std::cout << "Result of encrypted computation of AND(0, 0, 0) = " << result << std::endl;
     if (result != 0)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctOR1, &result, p);
     std::cout << "Result of encrypted computation of OR(1, 0, 0) = " << result << std::endl;
     if (result != 1)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctOR2, &result, p);
     std::cout << "Result of encrypted computation of OR(1, 1, 0) = " << result << std::endl;
     if (result != 1)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctOR3, &result, p);
     std::cout << "Result of encrypted computation of OR(1, 1, 1) = " << result << std::endl;
     if (result != 1)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     cc.Decrypt(sk, ctOR4, &result, p);
     std::cout << "Result of encrypted computation of OR(0, 0, 0) = " << result << std::endl;
     if (result != 0)
-        OPENFHE_THROW(math_error, "Decryption failure");
+        OPENFHE_THROW("Decryption failure");
 
     return 0;
 }
