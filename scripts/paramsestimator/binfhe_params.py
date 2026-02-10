@@ -20,7 +20,7 @@ import paramstable as stdparams
 import os
 import sys
 
-FORCE_q_eq_2N = True
+FORCE_q_eq_2N = False
 FORCE_openfhe32 = False
 
 def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decryption_failure, num_of_inputs, num_of_samples, d_ks, lower, upper, num_threads):
@@ -63,7 +63,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
     for d_g in range(lower, upper + 1):
         # Set ringsize n, Qks, N, Q based on the security level
         print("\nd_g loop: ", d_g)
-        ringsize_N = 1024
+        ringsize_N = 2048 if exp_sec_level in ('STD256Q',) else 1024
         opt_n = 0
         while (ringsize_N <= (1024 if FORCE_openfhe32 else 2048)):
             modulus_q = 2*ringsize_N if FORCE_q_eq_2N else ringsize_N
@@ -188,9 +188,8 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
                                    ])
             print("command args: ", command_arg)
 
-
-            print("table entry: ", '{ ' + ', '.join(( str(int(logmodQ)), str(2*ringsize_N), str(opt_n), str(modulus_q), str(int(optQks)), str(sigma),
-                  str(optB_ks), str(B_g), str(B_rk), str(10), ('GAUSSIAN', 'UNIFORM_TERNARY')[secret_dist])) + ' }')
+            print("table entry: ", '{ ' + ', '.join(( str(int(logmodQ)), str(2*ringsize_N), str(opt_n), str(modulus_q), str(int(optQks)), str(optB_ks),
+                str(B_g), str(B_rk), str(10), ('GAUSSIAN', 'UNIFORM_TERNARY')[secret_dist], str(sigma))) + ' }')
 
 def binary_search_n(start_n, end_N, prev_noise, exp_sec_level, target_noise_level, num_of_samples, d_ks, params, secret_dist_des, is_quantum, num_threads, num_of_inputs):
     n = 0
@@ -462,7 +461,7 @@ if __name__ == '__main__':
 
         upper_in = input("Enter upper bound for digit decomposition digits [default = 4]: ")
         if (not upper_in):
-            upper_in = 4
+            upper_in = 5
         upper = int(upper_in)
 
         num_threads_in = input("Enter number of threads that can be used to run the lattice-estimator (only used for the estimator) [default = 1]: ")

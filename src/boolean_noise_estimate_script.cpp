@@ -176,12 +176,12 @@ int main(int argc, char* argv[]) {
                 break;
             case 'h':
             default:
-                OPENFHE_THROW(not_available_error, usage());
+                OPENFHE_THROW(usage());
         }
     }
 
     if ((num_of_inputs < 2) || (num_of_inputs > 4))
-        OPENFHE_THROW(not_available_error, "num_of_inputs not in [2, 3, 4]");
+        OPENFHE_THROW("num_of_inputs not in [2, 3, 4]");
 
     BinFHEContextParams paramset;
     paramset.cyclOrder    = 2 * dim_N;
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     } else if (secret_dist == 1) {
         paramset.keyDist = UNIFORM_TERNARY;
     } else {
-        OPENFHE_THROW(not_available_error, "invalid secret key distribution");
+        OPENFHE_THROW("invalid secret key distribution");
     }
 
 
@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) {
     } else if (bootstrapping_technique == 3) {
         bt = LMKCDEY;
     } else {
-        OPENFHE_THROW(not_available_error, "invalid bootstrapping technique");
+        OPENFHE_THROW("invalid bootstrapping technique");
     }
 
     // Sample Program: Step 1: Set CryptoContext
