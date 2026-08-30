@@ -1,0 +1,13 @@
+# Development override: run the host checkout instead of the copy baked into
+# the image, so edits to the scripts and to src/*.cpp take effect immediately.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm estimator ...
+#
+# The mount shadows the image's prebuilt ./build, so the first run in a fresh
+# checkout recompiles the two estimator binaries (a few seconds). If your uid is
+# not 1000, export APP_UID=$(id -u) APP_GID=$(id -g) to keep files writable.
+services:
+  estimator:
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    volumes:
+      - .:/workspace

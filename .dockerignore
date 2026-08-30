@@ -1,0 +1,12 @@
+.git
+.gitignore
+build*/
+**/__pycache__/
+*.pyc
+# Scratch files the scripts leave behind in the repo root on a crash.
+out_file_*
+noise_file_*
+# Excluded so editing them does not invalidate the COPY layer.
+Dockerfile
+.dockerignore
+docker-compose*.yml

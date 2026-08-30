@@ -3,7 +3,99 @@ OpenFHE Lattice Estimator
 
 A parameter generation tool for DM/FHEW, CGGI/TFHE, and LMKCDEY. The tool takes as user input the desired design (e.g., bootstrapping method, failure probability, security level, etc.) and outputs several sets of optimized parameters (e.g., lattice parameter, ciphertext modulus, digit size), along with the runtime of bootstrapping for each set of parameters. The tool is based on [Lattice Estimator](https://github.com/malb/lattice-estimator), wich provides functions for estimating the concrete security of Learning with Errors (LWE) instances.
 
-## Pre-requisites: 
+## Running in Docker
+
+The image below bundles every prerequisite -- SageMath, numpy/scipy, the
+lattice-estimator, and an OpenFHE built with `WITH_NOISE_DEBUG=ON` -- so nothing
+in the `Pre-requisites` section below needs to be installed on the host. Those
+instructions remain for building natively.
+
+```
+docker compose build
+```
+
+The first build compiles OpenFHE from source and takes roughly 20-40 minutes;
+afterwards it is a cached layer and rebuilds are quick. OpenFHE's heavier
+translation units peak near 2 GB of RAM each, so parallelism defaults to 4 jobs.
+On a larger machine, raise it:
+
+```
+MAKE_JOBS=16 docker compose build
+```
+
+Run the parameter selector exactly as documented below, prefixed by
+`docker compose run --rm estimator`:
+
+```
+docker compose run --rm estimator \
+    sage -python scripts/paramsestimator/binfhe_params.py -t 3 -d 0 -p STD128Q -f -40 -I 2 -i 200 -k 3 -l 2 -u 4 -n 8
+```
+
+Or start a shell in the repo root inside the container and work from there:
+
+```
+docker compose run --rm estimator
+```
+
+For single-core KeyGen/EvalBinGate timings, set `OMP_NUM_THREADS` on the host --
+compose forwards it into the container:
+
+```
+OMP_NUM_THREADS=1 docker compose run --rm estimator \
+    sage -python scripts/paramsestimator/binfhe_params.py -t 3 -d 0 -p STD128Q -n 8
+```
+
+### Use `sage -python`, not `python3`
+
+Inside the container **both** scripts must be run with `sage -python`, including
+`binfhe_params_validator.py`:
+
+```
+docker compose run --rm estimator \
+    sage -python scripts/paramsestimator/binfhe_params_validator.py -p STD128_4 -t 2 -I 4 -i 1000
+```
+
+`binfhe_params_validator.py` imports `binfhe_params_helper`, which does
+`from estimator import *`, so it needs SageMath just as `binfhe_params.py` does.
+The plain `python3` form documented further below works on a Debian/Ubuntu host
+where `apt install sagemath` puts sagelib into the system python3; it does not
+work here, because this image's Sage lives in its own venv and the system
+python3 cannot see it.
+
+Do not work around that by putting Sage's venv on `PATH`. Importing `sage.all`
+from a python that lacks Sage's environment does not fail cleanly: it retries
+its interface subprocesses (GAP, Singular, PARI) without bound and spawns
+processes until the machine is unusable.
+
+### Changing the OpenFHE version
+
+This repository is currently known to work against OpenFHE v1.5.1, which the
+image pins. To try another tag or branch:
+
+```
+OPENFHE_REF=v1.5.0 docker compose build
+```
+
+The entrypoint refuses to start if the OpenFHE it finds was not built with
+`WITH_NOISE_DEBUG=ON`, since without that flag no noise values are emitted and
+the scripts fail far from the cause.
+
+### Editing the source
+
+`docker-compose.dev.yml` mounts your working copy over the image's baked-in
+copy, so changes to the Python scripts and to `src/*.cpp` take effect without a
+rebuild (the C++ sources are recompiled on entry when needed):
+
+```
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm estimator \
+    sage -python scripts/paramsestimator/binfhe_params.py -t 3 --all
+```
+
+The container runs as uid 1000 by default so bind-mounted files stay writable.
+If your uid differs, export `APP_UID=$(id -u) APP_GID=$(id -g)` before both the
+`build` and the `run`.
+
+## Pre-requisites (native install, not needed when using Docker)
 
 1. Install python with `sudo apt install python3` (tested with 3.8.10).
 2. Install sage with `sudo apt install sagemath` (tested with SageMath version 9.0).
@@ -15,7 +107,7 @@ A parameter generation tool for DM/FHEW, CGGI/TFHE, and LMKCDEY. The tool takes 
 
    **NOTE: The `WITH_NOISE_DEBUG` flag must be set to `ON` while running cmake (e.g., `cmake -DWITH_NOISE_DEBUG=ON ..`) for propper integration with openfhe-lattice-estimator scripts.**
 
-## Installation
+## Installation (native)
 
 1. Clone the [openfhe-lattice-estimator](https://github.com/openfheorg/openfhe-lattice-estimator) repository.
 2. Change to the openfhe-lattice-estimator directory and run

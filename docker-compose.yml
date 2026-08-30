@@ -1,0 +1,33 @@
+services:
+  estimator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Bump this (or export OPENFHE_REF) to move to a newer OpenFHE.
+        OPENFHE_REF: ${OPENFHE_REF:-v1.5.1}
+        # OpenFHE's heavier translation units peak near 2 GB each. 4 jobs suits
+        # a laptop or a memory-capped Docker Desktop VM; raise it on a big box.
+        MAKE_JOBS: ${MAKE_JOBS:-4}
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: openfhe-lattice-estimator:${OPENFHE_REF:-v1.5.1}
+
+    init: true
+    stdin_open: true
+    tty: true
+
+    # Safety net. sage.all retries its interface subprocesses without bound if
+    # it is ever started without Sage's environment, which can otherwise take a
+    # whole machine down. Generous for real work, fatal to a runaway.
+    pids_limit: 4096
+
+    environment:
+      # README step 3: set to 1 for single-core KeyGen/EvalBinGate timings.
+      # Listed without a value so it is forwarded only when actually set on the
+      # host. Assigning it an empty string instead makes libgomp print a warning
+      # on stderr -- the same stream the scripts read noise values from, which
+      # then dies in float('') far from the cause.
+      - OMP_NUM_THREADS
+
+    command: ["bash"]
