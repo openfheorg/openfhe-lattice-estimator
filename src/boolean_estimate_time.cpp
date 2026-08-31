@@ -49,7 +49,7 @@ uint32_t B_g    = 0;
 uint32_t B_ks   = 0;
 uint32_t B_rk   = 32;
 double sigma    = 3.19;
-uint32_t bootstrapping_technique = 0;
+uint32_t bootstrapping_technique = 2;
 uint32_t secret_dist = 0;
 
 inline std::string usage() {
@@ -74,8 +74,8 @@ int main(int argc, char* argv[]) {
     TimeVar t;
     auto cc = BinFHEContext();
 
-    char opt(0);
-    //*********************
+    int opt(0);
+    // *********************
     static struct option long_options[] = {{"Lattice dimension", required_argument, NULL, 'n'},
                                            {"Ring dimension", required_argument, NULL, 'N'},
                                            {"ct modulus", required_argument, NULL, 'q'},
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 
     const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:h";
     while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
-        std::cout << "opt1: " << opt << "; optarg: " << optarg << std::endl;
+        std::cout << "opt1: " << static_cast<char>(opt) << "; optarg: " << (optarg ? optarg : "(none)") << std::endl;
         switch (opt) {
             case 'n':
                 dim_n = atoi(optarg);
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
                 B_rk = atoi(optarg);
                 break;
             case 's':
-                sigma = atoi(optarg);
+                sigma = atof(optarg);
                 break;
             case 't':
                 bootstrapping_technique = atoi(optarg);
@@ -128,8 +128,11 @@ int main(int argc, char* argv[]) {
                 secret_dist = atoi(optarg);
                 break;
             case 'h':
+                std::cout << usage() << std::endl;
+                return 0;
             default:
-                OPENFHE_THROW(usage());
+                std::cerr << usage() << std::endl;
+                return 1;
         }
     }
 
@@ -197,11 +200,11 @@ int main(int argc, char* argv[]) {
     auto kskey = cc.GetSwitchKey();
     std::ostringstream bkeystring;
     lbcrypto::Serial::Serialize(bkey, bkeystring, lbcrypto::SerType::BINARY);
-    std::cout << "bootstrapping key size: " << bkeystring.str().size() << std::endl;
+    std::cout << "bootstrapping key size: " << static_cast<std::streamoff>(bkeystring.tellp()) << std::endl;
 
     std::ostringstream kskeystring;
     lbcrypto::Serial::Serialize(kskey, kskeystring, lbcrypto::SerType::BINARY);
-    std::cout << "key switching key size: " << kskeystring.str().size() << std::endl;
+    std::cout << "key switching key size: " << static_cast<std::streamoff>(kskeystring.tellp()) << std::endl;
 
     std::cout << "Completed the key generation." << std::endl;
 
@@ -221,7 +224,7 @@ int main(int argc, char* argv[]) {
 
     std::ostringstream ctstring;
     lbcrypto::Serial::Serialize(ct1, ctstring, lbcrypto::SerType::BINARY);
-    std::cout << "ciphertext size: " << ctstring.str().size() << std::endl;
+    std::cout << "ciphertext size: " << static_cast<std::streamoff>(ctstring.tellp()) << std::endl;
     std::cout << "ciphertext modulus: " << ct1->GetModulus() << std::endl;
     std::cout << "ciphertext dimension n: " << ct1->GetLength() << std::endl;
 

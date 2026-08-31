@@ -1,26 +1,27 @@
 #!/usr/bin/python
 
 '''
+Run with `sage -python`, not `python3`: this imports binfhe_params_helper, which
+imports the lattice-estimator and so needs SageMath. (Plain python3 works only
+where sagelib is installed into the system python, as `apt install sagemath` does.)
+
 usage (1): With -p ALL to calculate noise std deviation and probability of failure for named BINFHE_PARAMSET in OpenFHE.
-    > python3 scripts/paramsestimator/binfhe_params_validator.py -p ALL
+    > sage -python scripts/paramsestimator/binfhe_params_validator.py -p ALL
 
 usage (2): With a specific p and any of {t, I, i} arguments.
-    > python3 scripts/paramsestimator/binfhe_params_validator.py -p STD128_4_LMKCDEY -t 3 -I 4 -i 1000
+    > sage -python scripts/paramsestimator/binfhe_params_validator.py -p STD128_4_LMKCDEY -t 3 -I 4 -i 1000
 
 usage (3): With no p argument and the output of the binfhe_params.py script.
-    > python3 scripts/paramsestimator/binfhe_params_validator.py -n 518 -N 2048 -q 2048 -Q 54 -k 16384 -g 134217728 -r 32 -b 32 -s 3.19 -t 1 -d 1 -I 2 -i 200
+    > sage -python scripts/paramsestimator/binfhe_params_validator.py -n 518 -N 2048 -q 2048 -Q 54 -k 16384 -g 134217728 -r 32 -b 32 -s 3.19 -t 1 -d 1 -I 2 -i 200
 '''
 
-from math import log2, sqrt, erfc
-from statistics import stdev
+from statistics import fmean, stdev
 
 import argparse
 import binfhe_params_helper as h
-import os
-import random
 import sys
 
-PARAM_SETS = [ "TOY", "MEDIUM", "STD128_AP",
+PARAM_SETS = [ "TOY", "TOY_MULTI_BASE", "MEDIUM", "STD128_AP",
                "STD128", "STD128_3", "STD128_4", "STD128Q", "STD128Q_3", "STD128Q_4",
                "STD192", "STD192_3", "STD192_4", "STD192Q", "STD192Q_3", "STD192Q_4",
                "STD256", "STD256_3", "STD256_4", "STD256Q", "STD256Q_3", "STD256Q_4",
@@ -34,58 +35,48 @@ PARAM_SETS = [ "TOY", "MEDIUM", "STD128_AP",
                "SIGNED_MOD_TEST" ]
 BOOT_TECHS = { 1 : "AP", 2 : "GINX", 3 : "LMKCDEY" }
 
-def validator2(param_set, boot_tech, num_input, num_iters):
-    filenamerandom = str(random.randrange(500))
-    bashCommand = ' '.join([ "scripts/run_script2.sh", param_set, str(boot_tech), str(num_input), str(num_iters),
-                             "build", "> out_file_" + filenamerandom, "2> noise_file_" + filenamerandom ])
-    os.system(bashCommand)
+def summarize(perf, noise, num_input, gate_us):
+    """(noise stddev, noise mean, log2 failure probability, gate ms).
 
-    with open("noise_file_" + filenamerandom) as file:
-        noise_stdev = stdev([float(line.rstrip()) for line in file])
+    The mean is here because sigma alone cannot show a per-key noise bias: it is
+    taken about the sample mean. With several keys pooled, a mean well away from
+    zero is the tell.
+    """
+    noise_stdev = stdev(noise)
+    ctmodq      = int(perf["ctmodq"].strip().split(' ')[0])
 
-    with open("out_file_" + filenamerandom) as file:
-        ofdict = {d[0]: d[1] for d in [line.split(' ', 1) for line in file] if len(d) == 2}
+    # same maths as the search itself, kept in one place: ptmod = 2*num_input
+    failures = h.get_decryption_failure(noise_stdev, 2*num_input, ctmodq, num_input)
 
-    ctmodq = int(ofdict["ctmodq:"].strip().split(' ')[0])
-    num = ctmodq/(4*num_input)
-    denom = sqrt(2*num_input)*noise_stdev
-    val = erfc(num/denom)
-    failures = 0 if (val == 0) else log2(val)
-    gtime = int(ofdict["EvalBinGateTime:"].strip().split(' ')[0])
+    return noise_stdev, fmean(noise), failures, "%.1fms" % (gate_us/1000.0)
 
-    print((param_set, BOOT_TECHS[boot_tech], num_input, num_iters), (noise_stdev, failures, str(gtime) + 'ms'))
+def run(opts, num_input, num_keys):
+    """Speed on the whole machine, noise across single-threaded processes."""
+    gate_us, perf, binary = h.measure_speed(opts)
+    _out, noise = h.measure_noise(opts, num_keys, per_proc_bytes=h._key_bytes(perf), binary=binary)
+    return summarize(perf, noise, num_input, gate_us)
 
-def validator(dim_n, mod_q, dim_N, mod_logQ, mod_Qks, B_g, B_ks, B_rk, sigma, num_iters, secret_dist, boot_tech, num_input):
-    filenamerandom = str(random.randrange(500))
-    bashCommand = ' '.join([ "scripts/run_script.sh", str(dim_n), str(mod_q), str(dim_N), str(mod_logQ), str(mod_Qks), str(B_g),
-                             str(B_ks), str(B_rk), str(sigma), str(num_iters), str(secret_dist), str(boot_tech), str(num_input),
-                             "build", "> out_file_" + filenamerandom, "2> noise_file_" + filenamerandom ])
-    os.system(bashCommand)
+def validator2(param_set, boot_tech, num_input, num_iters, num_keys = h.DEFAULT_NUM_KEYS):
+    opts = [("-p", param_set), ("-t", boot_tech), ("-I", num_input), ("-i", num_iters)]
+    print((param_set, BOOT_TECHS[boot_tech], num_input, num_iters, num_keys), run(opts, num_input, num_keys))
 
-    with open("noise_file_" + filenamerandom) as file:
-        noise_stdev = stdev([float(line.rstrip()) for line in file])
-
-    with open("out_file_" + filenamerandom) as file:
-        ofdict = {d[0]: d[1] for d in [line.split(' ', 1) for line in file] if len(d) == 2}
-
-    ctmodq = int(ofdict["ctmodq:"].strip().split(' ')[0])
-    num = ctmodq/(4*num_input)
-    denom = sqrt(2*num_input)*noise_stdev
-    val = erfc(num/denom)
-    failures = 0 if (val == 0) else log2(val)
-    gtime = int(ofdict["EvalBinGateTime:"].strip().split(' ')[0])
-
-    print(bashCommand, (noise_stdev, failures, str(gtime) + 'ms'))
-
+def validator(dim_n, mod_q, dim_N, mod_logQ, mod_Qks, B_g, B_ks, B_rk, sigma, num_iters, secret_dist, boot_tech, num_input, num_keys = h.DEFAULT_NUM_KEYS):
+    opts = [("-n", dim_n), ("-q", mod_q), ("-N", dim_N), ("-Q", mod_logQ), ("-k", mod_Qks),
+            ("-g", B_g), ("-b", B_ks), ("-r", B_rk), ("-s", sigma), ("-i", num_iters),
+            ("-d", secret_dist), ("-t", boot_tech), ("-I", num_input)]
+    print(opts, run(opts, num_input, num_keys))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='binfhe_params_validator',
-                 description='calculates noise std deviation and probability of failure for input parameter set.')
+                 description='noise std deviation, mean and probability of failure for a parameter set. Noise is pooled over -K independent keys measured in parallel single-threaded processes; the gate time is measured separately with all cores.')
 
     parser.add_argument('-p', '--param_set', action='store', choices=PARAM_SETS + ["ALL"], default=None)
     parser.add_argument('-t', '--boot_tech', action='store', choices=(1, 2, 3), default=2, type=int)
     parser.add_argument('-I', '--num_input', action='store', choices=(2, 3, 4), default=2, type=int)
-    parser.add_argument('-i', '--num_iters', action='store', default=500, type=int)
+    parser.add_argument('-i', '--num_iters', action='store', default=500, type=int,
+                        help='noise samples PER KEY; total = num_iters * num_keys')
+    parser.add_argument('-K', '--num_keys', action='store', default=h.DEFAULT_NUM_KEYS, type=int,
+                        help='independent keys to pool noise over, measured in parallel (default 8)')
     parser.add_argument('-n', '--dim_n', action='store', type=int)
     parser.add_argument('-N', '--dim_N', action='store', type=int)
     parser.add_argument('-q', '--mod_q', action='store', type=int)
@@ -99,10 +90,18 @@ if __name__ == '__main__':
 
     a = parser.parse_args()
 
+    REQUIRED_WITHOUT_P = (("-n", "dim_n"), ("-N", "dim_N"), ("-q", "mod_q"), ("-Q", "mod_logQ"),
+                          ("-k", "mod_Qks"), ("-g", "B_g"), ("-b", "B_ks"))
+
+    if (not a.param_set):
+        missing = [flag for flag, name in REQUIRED_WITHOUT_P if getattr(a, name) is None]
+        if missing:
+            parser.error("without -p, these are required: %s" % ' '.join(missing))
+
     if (a.param_set):
-        print(("PARAM_SET", "BOOT_TECH", "NUM_INPUTS", "NUM_ITERS"), ("noise_stdev", "failure_rate", "EvalBinGateTime"))
+        print(("PARAM_SET", "BOOT_TECH", "NUM_INPUTS", "NUM_ITERS"), ("noise_stdev", "noise_mean", "failure_rate", "EvalBinGateTime"))
         if (a.param_set in PARAM_SETS):
-            validator2(a.param_set, a.boot_tech, a.num_input, a.num_iters)
+            validator2(a.param_set, a.boot_tech, a.num_input, a.num_iters, a.num_keys)
         elif (a.param_set == "ALL"):
             for param_set in PARAM_SETS:
                 p = param_set.split('_')
@@ -110,12 +109,9 @@ if __name__ == '__main__':
                 num_input = a.num_input
                 if (len(p) >= 2) and (p[1] in ('3', '4')):
                     num_input = int(p[1])
-                validator2(param_set, boot_tech, num_input, a.num_iters)
+                validator2(param_set, boot_tech, num_input, a.num_iters, a.num_keys)
         else:
             print("Invalid Args")
             print(sys.argv)
     else:
-        validator(a.dim_n, a.mod_q, a.dim_N, a.mod_logQ, a.mod_Qks, a.B_g, a.B_ks, a.B_rk, a.sigma, a.num_iters, a.secret_dist, a.boot_tech, a.num_input)
-
-    h.rm_out_files("out_file_")
-    h.rm_out_files("noise_file_")
+        validator(a.dim_n, a.mod_q, a.dim_N, a.mod_logQ, a.mod_Qks, a.B_g, a.B_ks, a.B_rk, a.sigma, a.num_iters, a.secret_dist, a.boot_tech, a.num_input, a.num_keys)

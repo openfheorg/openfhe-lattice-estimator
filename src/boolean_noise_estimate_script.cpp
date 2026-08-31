@@ -36,12 +36,44 @@
 
 #include <type_traits>
 #include "binfhecontext.h"
+#include "utils/memory.h"
 #include "utils/sertype.h"
 #include "utils/serial.h"
 #include <getopt.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <unordered_map>
 
 using namespace lbcrypto;
+
+static uint64_t parse_uint(const char* s, const char* name, uint64_t hi) {
+    if ((s == nullptr) || (*s == '\0') || (std::strchr(s, '-') != nullptr))
+        OPENFHE_THROW(std::string("--") + name + ": expected a non-negative integer, got '" +
+                      (s ? s : "(none)") + "'");
+    errno     = 0;
+    char* end = nullptr;
+    unsigned long long v = std::strtoull(s, &end, 10);
+    if ((end == s) || (*end != '\0') || (errno == ERANGE) || (v > hi))
+        OPENFHE_THROW(std::string("--") + name + ": expected an integer in [0, " +
+                      std::to_string(hi) + "], got '" + s + "'");
+    return v;
+}
+
+static uint32_t parse_u32(const char* s, const char* name) {
+    return static_cast<uint32_t>(parse_uint(s, name, std::numeric_limits<uint32_t>::max()));
+}
+
+static double parse_double(const char* s, const char* name) {
+    errno     = 0;
+    char* end = nullptr;
+    double v  = std::strtod(s ? s : "", &end);
+    if ((s == nullptr) || (end == s) || (*end != '\0') || (errno == ERANGE) || !(v > 0.0))
+        OPENFHE_THROW(std::string("--") + name + ": expected a positive number, got '" +
+                      (s ? s : "(none)") + "'");
+    return v;
+}
 
 inline std::string usage() {
     return std::string("\n\nusage: \n"
@@ -58,14 +90,17 @@ inline std::string usage() {
                        "  -d secret key distribution\n"
                        "  -a number of auto keys\n"
                        "  -I number of gate inputs\n"
-                       "  -i number of iterations\n"
+                       "  -i gates per key (noise samples produced per key)\n"
+                       "  -K independent keys to pool noise over (default 8)\n"
+                       "     total noise samples = -i * -K\n"
                        "  -p label for named binfhe param set (overrides other settings)\n"
+                       "  -Z skip key/ciphertext size reporting (avoids a large transient allocation)\n"
                        "  -h display this message\n"
                      );
 }
 
 static const std::unordered_map<std::string, BINFHE_PARAMSET> ptable = {
-    {"TOY", TOY}, {"MEDIUM", MEDIUM}, {"STD128_AP", STD128_AP},
+    {"TOY", TOY}, {"TOY_MULTI_BASE", TOY_MULTI_BASE}, {"MEDIUM", MEDIUM}, {"STD128_AP", STD128_AP},
     {"STD128", STD128}, {"STD128_3", STD128_3}, {"STD128_4", STD128_4},
     {"STD128Q", STD128Q}, {"STD128Q_3", STD128Q_3}, {"STD128Q_4", STD128Q_4},
     {"STD192", STD192}, {"STD192_3", STD192_3}, {"STD192_4", STD192_4},
@@ -103,85 +138,113 @@ int main(int argc, char* argv[]) {
     uint32_t numAutoKeys             = 10;
     uint32_t num_of_inputs           = 2;
     uint32_t num_of_runs             = 200;
+    uint32_t num_of_keys             = 8;
+    bool report_sizes                = true;
     std::string namedparamset;
 
-    static struct option long_options[] = {{"lattice dimension", required_argument, NULL, 'n'},
-                                           {"ring dimension", required_argument, NULL, 'N'},
-                                           {"ct modulus", required_argument, NULL, 'q'},
-                                           {"size of ring modulus", required_argument, NULL, 'Q'},
-                                           {"size of key switching mod Qks", required_argument, NULL, 'k'},
-                                           {"digit base B_g", required_argument, NULL, 'g'},
-                                           {"refreshing key base B_rk", required_argument, NULL, 'r'},
-                                           {"key switching base B_ks", required_argument, NULL, 'b'},
-                                           {"sigma (standard deviation)", required_argument, NULL, 's'},
-                                           {"bootstrapping technique", required_argument, NULL, 't'},
-                                           {"secret key distribution", required_argument, NULL, 'd'},
-                                           {"number of auto keys", required_argument, NULL, 'a'},
-                                           {"number of gate inputs", required_argument, NULL, 'I'},
-                                           {"number of iterations", required_argument, NULL, 'i'},
-                                           {"label for named binfhe param set (overrides other settings)", required_argument, NULL, 'p'},
+    static struct option long_options[] = {{"lattice-dimension", required_argument, NULL, 'n'},
+                                           {"ring-dimension", required_argument, NULL, 'N'},
+                                           {"ct-modulus", required_argument, NULL, 'q'},
+                                           {"ring-modulus-bits", required_argument, NULL, 'Q'},
+                                           {"keyswitch-modulus", required_argument, NULL, 'k'},
+                                           {"gadget-base", required_argument, NULL, 'g'},
+                                           {"refresh-key-base", required_argument, NULL, 'r'},
+                                           {"keyswitch-base", required_argument, NULL, 'b'},
+                                           {"sigma", required_argument, NULL, 's'},
+                                           {"bootstrapping-technique", required_argument, NULL, 't'},
+                                           {"secret-key-distribution", required_argument, NULL, 'd'},
+                                           {"num-auto-keys", required_argument, NULL, 'a'},
+                                           {"num-gate-inputs", required_argument, NULL, 'I'},
+                                           {"num-iterations", required_argument, NULL, 'i'},
+                                           {"num-keys", required_argument, NULL, 'K'},
+                                           {"param-set", required_argument, NULL, 'p'},
+                                           {"no-sizes", no_argument, NULL, 'Z'},
                                            {"help", no_argument, NULL, 'h'},
                                            {NULL, 0, NULL, 0}};
 
-    char opt(0);
-    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:a:I:i:p:h";
+    int opt(0);
+    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:a:I:i:K:p:Zh";
     while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
-        std::cout << "opt1: " << opt << "; optarg: " << optarg << std::endl;
+        std::cout << "opt1: " << static_cast<char>(opt) << "; optarg: " << (optarg ? optarg : "(none)") << std::endl;
         switch (opt) {
             case 'n':
-                dim_n = atoi(optarg);
+                dim_n = parse_u32(optarg, "lattice-dimension");
                 break;
             case 'N':
-                dim_N = atoi(optarg);
+                dim_N = parse_u32(optarg, "ring-dimension");
                 break;
             case 'Q':
-                logQ = atoi(optarg);
+                logQ = parse_u32(optarg, "ring-modulus-bits");
                 break;
             case 'q':
-                ctmodq = atoi(optarg);
+                ctmodq = parse_u32(optarg, "ct-modulus");
                 break;
             case 'k':
-                // Qks = atoi(optarg);
-                std::stringstream(optarg) >> Qks;
+                Qks = parse_uint(optarg, "keyswitch-modulus", std::numeric_limits<uint64_t>::max());
                 break;
             case 'g':
-                B_g = atoi(optarg);
+                B_g = parse_u32(optarg, "gadget-base");
                 break;
             case 'b':
-                B_ks = atoi(optarg);
+                B_ks = parse_u32(optarg, "keyswitch-base");
                 break;
             case 'r':
-                B_rk = atoi(optarg);
+                B_rk = parse_u32(optarg, "refresh-key-base");
                 break;
             case 's':
-                sigma = atof(optarg);
+                sigma = parse_double(optarg, "sigma");
                 break;
             case 't':
-                bootstrapping_technique = atoi(optarg);
+                bootstrapping_technique = parse_u32(optarg, "bootstrapping-technique");
                 break;
             case 'd':
-                secret_dist = atoi(optarg);
+                secret_dist = parse_u32(optarg, "secret-key-distribution");
                 break;
             case 'a':
-                numAutoKeys = atoi(optarg);
+                numAutoKeys = parse_u32(optarg, "num-auto-keys");
                 break;
             case 'I':
-                num_of_inputs = atoi(optarg);
+                num_of_inputs = parse_u32(optarg, "num-gate-inputs");
                 break;
             case 'i':
-                num_of_runs = atoi(optarg);
+                num_of_runs = parse_u32(optarg, "num-iterations");
+                break;
+            case 'K':
+                num_of_keys = parse_u32(optarg, "num-keys");
+                break;
+            case 'Z':
+                report_sizes = false;
                 break;
             case 'p':
                 std::stringstream(optarg) >> namedparamset;
                 break;
             case 'h':
+                std::cout << usage() << std::endl;
+                return 0;
             default:
-                OPENFHE_THROW(usage());
+                std::cerr << usage() << std::endl;
+                return 1;
         }
     }
 
     if ((num_of_inputs < 2) || (num_of_inputs > 4))
         OPENFHE_THROW("num_of_inputs not in [2, 3, 4]");
+
+    if (num_of_keys < 1)
+        OPENFHE_THROW("num_of_keys must be >= 1");
+
+    if (num_of_runs < 1)
+        OPENFHE_THROW("num_of_runs must be >= 1");
+
+    if (!namedparamset.empty() && (ptable.find(namedparamset) == ptable.end())) {
+        std::string known;
+        for (auto&& kv : ptable)
+            known += (known.empty() ? "" : " ") + kv.first;
+        OPENFHE_THROW("unknown --param-set '" + namedparamset + "'; known sets are: " + known);
+    }
+
+    if (Qks > std::numeric_limits<uint32_t>::max())
+        OPENFHE_THROW("Qks does not fit in uint32_t (BinFHEContextParams::modKS)");
 
     BinFHEContextParams paramset;
     paramset.cyclOrder    = 2 * dim_N;
@@ -231,75 +294,101 @@ int main(int argc, char* argv[]) {
     }
 
     // Sample Program: Step 1: Set CryptoContext
-    auto cc = BinFHEContext();
-    if (!namedparamset.empty()) {
+    if (!namedparamset.empty())
         std::cout << "parameters from commandline overridden with: " << namedparamset << std::endl;
-        cc.GenerateBinFHEContext(ptable.at(namedparamset), bt);
-    } else {
-        cc.GenerateBinFHEContext(paramset, bt);
-    }
+
+    auto make_context = [&]() {
+        BinFHEContext c;
+        if (!namedparamset.empty())
+            c.GenerateBinFHEContext(ptable.at(namedparamset), bt);
+        else
+            c.GenerateBinFHEContext(paramset, bt);
+        return c;
+    };
 
     // Sample Program: Step 2: Key Generation
 
-    TimeVar t;
-    TIC(t);
-    auto sk = cc.KeyGen();
-    cc.BTKeyGen(sk);
-    std::cout << "BootstrapKeyGenTime: " << TOC_MS(t) << " milliseconds" << std::endl;
-
-    {
-        auto bkey  = cc.GetRefreshKey();
-        std::ostringstream bkeystring;
-        lbcrypto::Serial::Serialize(bkey, bkeystring, lbcrypto::SerType::BINARY);
-        std::cout << "BootstrappingKeySize: " << bkeystring.str().size() << std::endl;
-    }
-
-    {
-        auto kskey = cc.GetSwitchKey();
-        std::ostringstream kskeystring;
-        lbcrypto::Serial::Serialize(kskey, kskeystring, lbcrypto::SerType::BINARY);
-        std::cout << "KeySwitchingKeySize: " << kskeystring.str().size() << std::endl;
-    }
-
-
-    // Sample Program: Step 3: Encryption
-
-    auto p   = 2 * num_of_inputs;
-    std::vector<LWECiphertext> cts(num_of_inputs);
-    for (auto&& ct : cts)
-        ct = cc.Encrypt(sk, 0, SMALL_DIM, p);
-
-    {
-        std::ostringstream ctstring;
-        lbcrypto::Serial::Serialize(cts.front(), ctstring, lbcrypto::SerType::BINARY);
-        std::cout << "CiphertextSize: " << ctstring.str().size() << std::endl;
-    }
-
-
-    // Sample Program: Step 4: Evaluation
-
+    auto p          = 2 * num_of_inputs;
     const auto eq2  = num_of_inputs == 2;
     const auto gate = gtable.at(num_of_inputs);
 
-    TIC(t);
+    TimeVar t;
+    double keygen_ms = 0.0;
+    double gate_us   = 0.0;
+    uint64_t gates   = 0;
+    auto fcnt        = 0;
     LWEPlaintext result;
-    auto fcnt = 0;
-    for (uint32_t i = 0; i < num_of_runs; ++i) {
+
+    // One key hides a per-key noise bias entirely (sigma is taken about the
+    // sample mean) and leaves a ~2% key-to-key spread that no amount of
+    // sampling reduces. Pooling over -K independent keys is what makes a
+    // failure-probability claim mean anything below a few bits.
+    NativeInteger ctmod(0);
+    for (uint32_t k = 0; k < num_of_keys; ++k) {
+        auto cc = make_context();
+        ctmod   = cc.GetParams()->GetLWEParams()->Getq();
+
+        TIC(t);
+        auto sk = cc.KeyGen();
+        cc.BTKeyGen(sk);
+        keygen_ms += TOC_MS(t);
+
+        std::vector<LWECiphertext> cts(num_of_inputs);
         for (auto&& ct : cts)
             ct = cc.Encrypt(sk, 0, SMALL_DIM, p);
 
-        auto ct = eq2 ? cc.EvalBinGate(gate, cts[0], cts[1]) : cc.EvalBinGate(gate, cts);
+        // Measuring the keys costs a full serialized copy of them, which for a
+        // multi-GB key-switching key dwarfs everything else the process holds.
+        // Only one run per candidate needs the sizes (the speed probe), so the
+        // parallel noise runs pass -Z and skip it entirely.
+        if ((k == 0) && report_sizes) {
+            // Separate scopes so two multi-GB buffers are never alive at once.
+            {
+                std::ostringstream ss;
+                lbcrypto::Serial::Serialize(cc.GetRefreshKey(), ss, lbcrypto::SerType::BINARY);
+                std::cout << "BootstrappingKeySize: " << static_cast<std::streamoff>(ss.tellp()) << std::endl;
+            }
+            {
+                std::ostringstream ss;
+                lbcrypto::Serial::Serialize(cc.GetSwitchKey(), ss, lbcrypto::SerType::BINARY);
+                std::cout << "KeySwitchingKeySize: " << static_cast<std::streamoff>(ss.tellp()) << std::endl;
+            }
+            {
+                std::ostringstream ss;
+                lbcrypto::Serial::Serialize(cts.front(), ss, lbcrypto::SerType::BINARY);
+                std::cout << "CiphertextSize: " << static_cast<std::streamoff>(ss.tellp()) << std::endl;
+            }
+        }
 
-        cc.Decrypt(sk, ct, &result, p);
+        // Keygen and the serialization above are transient peaks; hand the freed
+        // arenas back before the gate loop, which is the long-lived phase and
+        // the one that decides how many of these fit in memory side by side.
+        lbcrypto::AllocTrim();
 
-        if (result != 0)
-            ++fcnt;
+        for (uint32_t i = 0; i < num_of_runs; ++i) {
+            for (auto&& ct : cts)
+                ct = cc.Encrypt(sk, 0, SMALL_DIM, p);
 
+            TIC(t);
+            auto ct = eq2 ? cc.EvalBinGate(gate, cts[0], cts[1]) : cc.EvalBinGate(gate, cts);
+            gate_us += TOC_US(t);
+            ++gates;
+
+            cc.Decrypt(sk, ct, &result, p);
+
+            if (result != 0)
+                ++fcnt;
+        }
     }
-    std::cout << "EvalBinGateTime: " << (TOC_MS(t)/num_of_runs) << " milliseconds" << std::endl;
+
+    std::cout << "BootstrapKeyGenTime: " << static_cast<uint64_t>(keygen_ms/num_of_keys) << " milliseconds" << std::endl;
+    std::cout << "EvalBinGateTime: " << static_cast<uint64_t>(gate_us/gates/1000.0) << " milliseconds" << std::endl;
+    // finer resolution than the integer millisecond above, for ranking candidates
+    std::cout << "EvalBinGateTimeUs: " << (gate_us/gates) << std::endl;
+    std::cout << "NumKeys: " << num_of_keys << std::endl;
     std::cout << "Gate: " << gate << std::endl;
     std::cout << "Failures: " << fcnt << std::endl;
-    std::cout << "ctmodq: " << cc.GetParams()->GetLWEParams()->Getq() << std::endl;
+    std::cout << "ctmodq: " << ctmod << std::endl;
 
     return 0;
 }

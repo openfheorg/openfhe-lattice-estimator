@@ -4,18 +4,31 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Bump this (or export OPENFHE_REF) to move to a newer OpenFHE.
-        OPENFHE_REF: ${OPENFHE_REF:-v1.5.1}
+        # A tag, branch name, or full commit SHA. Bump here (or export
+        # OPENFHE_REF) to move to a different OpenFHE.
+        OPENFHE_REF: ${OPENFHE_REF:-252b2b1f410b0bd5f7b25faa4a4791d8a0882fdf}
         # OpenFHE's heavier translation units peak near 2 GB each. 4 jobs suits
         # a laptop or a memory-capped Docker Desktop VM; raise it on a big box.
         MAKE_JOBS: ${MAKE_JOBS:-4}
         APP_UID: ${APP_UID:-1000}
         APP_GID: ${APP_GID:-1000}
-    image: openfhe-lattice-estimator:${OPENFHE_REF:-v1.5.1}
+        # clang-18 measured ~2x faster than gcc for BinFHE gates. NATIVEOPT=ON
+        # bakes in -march=native: fast, but the image then requires a CPU at
+        # least as capable as the build machine. Export WITH_NATIVEOPT=OFF for
+        # an image you intend to move between machines.
+        CC_BIN: ${CC_BIN:-clang-18}
+        CXX_BIN: ${CXX_BIN:-clang++-18}
+        WITH_NATIVEOPT: ${WITH_NATIVEOPT:-ON}
+    image: openfhe-lattice-estimator:${OPENFHE_REF:-252b2b1f410b0bd5f7b25faa4a4791d8a0882fdf}
 
     init: true
     stdin_open: true
     tty: true
+
+    # No memory limit by default, so the container may use all host RAM. The
+    # measurement fan-out reads MemAvailable and honours a cgroup limit, so
+    # setting one here (mem_limit: 32g) is respected rather than fought.
+    # mem_limit: 32g
 
     # Safety net. sage.all retries its interface subprocesses without bound if
     # it is ever started without Sage's environment, which can otherwise take a
