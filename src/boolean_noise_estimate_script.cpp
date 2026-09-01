@@ -36,6 +36,10 @@
 
 #include <type_traits>
 #include "binfhecontext.h"
+
+// lookup_paramset asks the LIBRARY which sets exist, so this binary can address
+// every row of its table rather than a list transcribed when there were 45.
+#include "binfhe_cli.h"
 #include "utils/memory.h"
 #include "utils/sertype.h"
 #include "utils/serial.h"
@@ -44,6 +48,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <map>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 
 using namespace lbcrypto;
@@ -59,6 +66,34 @@ static uint64_t parse_uint(const char* s, const char* name, uint64_t hi) {
         OPENFHE_THROW(std::string("--") + name + ": expected an integer in [0, " +
                       std::to_string(hi) + "], got '" + s + "'");
     return v;
+}
+
+// "base:count,base:count" -> the map OpenFHE wants. Parsed strictly: the whole
+// point of this option is calibrating the per-coefficient accumulator model, and
+// a silently mis-parsed split would be fitted as physics.
+static std::map<uint32_t, uint32_t> parse_gadget_map(const char* s) {
+    std::map<uint32_t, uint32_t> out;
+    std::stringstream ss(s ? s : "");
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        auto colon = item.find(':');
+        if (colon == std::string::npos)
+            OPENFHE_THROW("--gadget-map: expected \"base:count\" pairs, got '" + item + "'");
+        auto base  = parse_uint(item.substr(0, colon).c_str(), "gadget-map base",
+                                std::numeric_limits<uint32_t>::max());
+        auto count = parse_uint(item.substr(colon + 1).c_str(), "gadget-map count",
+                                std::numeric_limits<uint32_t>::max());
+        if ((base < 2) || ((base & (base - 1)) != 0))
+            OPENFHE_THROW("--gadget-map: base must be a power of two >= 2, got " +
+                          std::to_string(base));
+        if (count == 0)
+            OPENFHE_THROW("--gadget-map: count must be > 0 for base " + std::to_string(base));
+        if (!out.emplace(static_cast<uint32_t>(base), static_cast<uint32_t>(count)).second)
+            OPENFHE_THROW("--gadget-map: base " + std::to_string(base) + " given twice");
+    }
+    if (out.empty())
+        OPENFHE_THROW("--gadget-map: no base:count pairs parsed");
+    return out;
 }
 
 static uint32_t parse_u32(const char* s, const char* name) {
@@ -83,6 +118,7 @@ inline std::string usage() {
                        "  -Q size of ring modulus\n"
                        "  -k size of key switching mod Qks\n"
                        "  -g digit base B_g\n"
+                       "  -G per-dimension gadget map, \"base:count,base:count\" (counts must sum to -n)\n"
                        "  -r refreshing key base B_rk\n"
                        "  -b key switching base B_ks\n"
                        "  -s sigma (standard deviation)\n"
@@ -95,31 +131,11 @@ inline std::string usage() {
                        "     total noise samples = -i * -K\n"
                        "  -p label for named binfhe param set (overrides other settings)\n"
                        "  -Z skip key/ciphertext size reporting (avoids a large transient allocation)\n"
+                       "  -3 32-bit internal key forms where they fit (Q <= 2^28); the DEFAULT since OpenFHE 9e8045db; no-op on NATIVE_SIZE=32\n"
+                       "  -6 force the 64-bit key forms (the A/B against -3; noise is bit-identical either way)\n"
                        "  -h display this message\n"
                      );
 }
-
-static const std::unordered_map<std::string, BINFHE_PARAMSET> ptable = {
-    {"TOY", TOY}, {"TOY_MULTI_BASE", TOY_MULTI_BASE}, {"MEDIUM", MEDIUM}, {"STD128_AP", STD128_AP},
-    {"STD128", STD128}, {"STD128_3", STD128_3}, {"STD128_4", STD128_4},
-    {"STD128Q", STD128Q}, {"STD128Q_3", STD128Q_3}, {"STD128Q_4", STD128Q_4},
-    {"STD192", STD192}, {"STD192_3", STD192_3}, {"STD192_4", STD192_4},
-    {"STD192Q", STD192Q}, {"STD192Q_3", STD192Q_3}, {"STD192Q_4", STD192Q_4},
-    {"STD256", STD256}, {"STD256_3", STD256_3}, {"STD256_4", STD256_4},
-    {"STD256Q", STD256Q}, {"STD256Q_3", STD256Q_3}, {"STD256Q_4", STD256Q_4},
-    {"STD128_LMKCDEY", STD128_LMKCDEY}, {"STD128Q_LMKCDEY", STD128Q_LMKCDEY},
-    {"STD128_3_LMKCDEY", STD128_3_LMKCDEY}, {"STD128Q_3_LMKCDEY", STD128Q_3_LMKCDEY},
-    {"STD128_4_LMKCDEY", STD128_4_LMKCDEY}, {"STD128Q_4_LMKCDEY", STD128Q_4_LMKCDEY},
-    {"STD192_LMKCDEY", STD192_LMKCDEY}, {"STD192Q_LMKCDEY", STD192Q_LMKCDEY},
-    {"STD192_3_LMKCDEY", STD192_3_LMKCDEY}, {"STD192Q_3_LMKCDEY", STD192Q_3_LMKCDEY},
-    {"STD192_4_LMKCDEY", STD192_4_LMKCDEY}, {"STD192Q_4_LMKCDEY", STD192Q_4_LMKCDEY},
-    {"STD256_LMKCDEY", STD256_LMKCDEY}, {"STD256Q_LMKCDEY", STD256Q_LMKCDEY},
-    {"STD256_3_LMKCDEY", STD256_3_LMKCDEY}, {"STD256Q_3_LMKCDEY", STD256Q_3_LMKCDEY},
-    {"STD256_4_LMKCDEY", STD256_4_LMKCDEY}, {"STD256Q_4_LMKCDEY", STD256Q_4_LMKCDEY},
-    {"LPF_STD128", LPF_STD128}, {"LPF_STD128Q", LPF_STD128Q},
-    {"LPF_STD128_LMKCDEY", LPF_STD128_LMKCDEY}, {"LPF_STD128Q_LMKCDEY", LPF_STD128Q_LMKCDEY},
-    {"SIGNED_MOD_TEST", SIGNED_MOD_TEST}
-};
 
 static const std::unordered_map<uint32_t, BINGATE> gtable = { {2, OR}, {3, OR3}, {4, OR4} };
 
@@ -140,6 +156,17 @@ int main(int argc, char* argv[]) {
     uint32_t num_of_runs             = 200;
     uint32_t num_of_keys             = 8;
     bool report_sizes                = true;
+    std::map<uint32_t, uint32_t> gadgetBaseMap;
+    // The runtime-NS32 hybrid: a bootstrapping key held internally at 32 bits
+    // inside a 64-bit build, for Q <= 2^28 (OpenFHE f56c301b). It was opt-in
+    // until 9e8045db; BTKeyGen's internal32 now defaults to TRUE, and this
+    // default follows the library's so that "no flag" measures what a default
+    // caller gets. Each key is still gated on its own Fits() check, so a
+    // configuration can hold the 32-bit form for the switching key and not the
+    // accumulator key (every shipped set does: qKS is 2^14..2^17 whatever Q is).
+    // -3 asks for the 32-bit forms explicitly (kept for old plans), -6 forces
+    // the 64-bit forms -- the A/B against the old path needs it now.
+    bool internal32 = true;
     std::string namedparamset;
 
     static struct option long_options[] = {{"lattice-dimension", required_argument, NULL, 'n'},
@@ -148,6 +175,7 @@ int main(int argc, char* argv[]) {
                                            {"ring-modulus-bits", required_argument, NULL, 'Q'},
                                            {"keyswitch-modulus", required_argument, NULL, 'k'},
                                            {"gadget-base", required_argument, NULL, 'g'},
+                                           {"gadget-map", required_argument, NULL, 'G'},
                                            {"refresh-key-base", required_argument, NULL, 'r'},
                                            {"keyswitch-base", required_argument, NULL, 'b'},
                                            {"sigma", required_argument, NULL, 's'},
@@ -159,11 +187,13 @@ int main(int argc, char* argv[]) {
                                            {"num-keys", required_argument, NULL, 'K'},
                                            {"param-set", required_argument, NULL, 'p'},
                                            {"no-sizes", no_argument, NULL, 'Z'},
+                                           {"internal32", no_argument, NULL, '3'},
+                                           {"internal64", no_argument, NULL, '6'},
                                            {"help", no_argument, NULL, 'h'},
                                            {NULL, 0, NULL, 0}};
 
     int opt(0);
-    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:a:I:i:K:p:Zh";
+    const char* optstring = "n:N:q:Q:k:g:G:r:b:s:t:d:a:I:i:K:p:Z36h";
     while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         std::cout << "opt1: " << static_cast<char>(opt) << "; optarg: " << (optarg ? optarg : "(none)") << std::endl;
         switch (opt) {
@@ -184,6 +214,9 @@ int main(int argc, char* argv[]) {
                 break;
             case 'g':
                 B_g = parse_u32(optarg, "gadget-base");
+                break;
+            case 'G':
+                gadgetBaseMap = parse_gadget_map(optarg);
                 break;
             case 'b':
                 B_ks = parse_u32(optarg, "keyswitch-base");
@@ -212,6 +245,12 @@ int main(int argc, char* argv[]) {
             case 'K':
                 num_of_keys = parse_u32(optarg, "num-keys");
                 break;
+            case '3':
+                internal32 = true;
+                break;
+            case '6':
+                internal32 = false;
+                break;
             case 'Z':
                 report_sizes = false;
                 break;
@@ -236,12 +275,10 @@ int main(int argc, char* argv[]) {
     if (num_of_runs < 1)
         OPENFHE_THROW("num_of_runs must be >= 1");
 
-    if (!namedparamset.empty() && (ptable.find(namedparamset) == ptable.end())) {
-        std::string known;
-        for (auto&& kv : ptable)
-            known += (known.empty() ? "" : " ") + kv.first;
-        OPENFHE_THROW("unknown --param-set '" + namedparamset + "'; known sets are: " + known);
-    }
+    // Validate the name up front rather than at context construction: a run that
+    // dies after keygen has already spent the expensive part.
+    if (!namedparamset.empty())
+        (void)estimator::lookup_paramset(namedparamset);
 
     if (Qks > std::numeric_limits<uint32_t>::max())
         OPENFHE_THROW("Qks does not fit in uint32_t (BinFHEContextParams::modKS)");
@@ -257,6 +294,22 @@ int main(int argc, char* argv[]) {
     paramset.stdDev       = sigma;
     paramset.latticeParam = dim_n;
     paramset.numAutoKeys = numAutoKeys;
+
+    if (!gadgetBaseMap.empty()) {
+        uint64_t covered = 0;
+        for (auto&& kv : gadgetBaseMap)
+            covered += kv.second;
+        // OpenFHE throws "Gadget base map does not cover the LWE dimension" lazily
+        // at keygen; say it here, with the numbers.
+        if (covered != dim_n)
+            OPENFHE_THROW("--gadget-map counts sum to " + std::to_string(covered) +
+                          " but -n is " + std::to_string(dim_n) +
+                          "; the map must cover the LWE dimension exactly");
+        paramset.gadgetBaseMap = gadgetBaseMap;
+        // gadgetBase stays the default base (LMKCDEY's automorphism keys use it)
+        if (B_g == 0)
+            paramset.gadgetBase = gadgetBaseMap.begin()->first;
+    }
 
     if (secret_dist == 0) {
         paramset.keyDist = GAUSSIAN;
@@ -297,13 +350,18 @@ int main(int argc, char* argv[]) {
     if (!namedparamset.empty())
         std::cout << "parameters from commandline overridden with: " << namedparamset << std::endl;
 
-    auto make_context = [&]() {
-        BinFHEContext c;
+    // Fills a caller-owned context rather than returning one. BinFHEContext is
+    // neither copyable nor movable as of 1c3e83ec: it holds a
+    // `mutable std::mutex m_widenMutex` (binfhecontext.h:615) guarding the lazy
+    // 64-bit widening in GetRefreshKey()/GetSwitchKey(), and a mutex member
+    // deletes both the copy and the move constructor. Returning by value here
+    // therefore stopped compiling ("call to implicitly-deleted copy
+    // constructor"). Do not "simplify" this back to a return.
+    auto make_context = [&](BinFHEContext& c) {
         if (!namedparamset.empty())
-            c.GenerateBinFHEContext(ptable.at(namedparamset), bt);
+            c.GenerateBinFHEContext(estimator::lookup_paramset(namedparamset), bt);
         else
             c.GenerateBinFHEContext(paramset, bt);
-        return c;
     };
 
     // Sample Program: Step 2: Key Generation
@@ -325,34 +383,29 @@ int main(int argc, char* argv[]) {
     // failure-probability claim mean anything below a few bits.
     NativeInteger ctmod(0);
     for (uint32_t k = 0; k < num_of_keys; ++k) {
-        auto cc = make_context();
-        ctmod   = cc.GetParams()->GetLWEParams()->Getq();
+        BinFHEContext cc;
+        make_context(cc);
+        ctmod = cc.GetParams()->GetLWEParams()->Getq();
 
         TIC(t);
         auto sk = cc.KeyGen();
-        cc.BTKeyGen(sk);
+        cc.BTKeyGen(sk, SYM_ENCRYPT, internal32);
         keygen_ms += TOC_MS(t);
 
         std::vector<LWECiphertext> cts(num_of_inputs);
         for (auto&& ct : cts)
             ct = cc.Encrypt(sk, 0, SMALL_DIM, p);
 
-        // Measuring the keys costs a full serialized copy of them, which for a
-        // multi-GB key-switching key dwarfs everything else the process holds.
-        // Only one run per candidate needs the sizes (the speed probe), so the
-        // parallel noise runs pass -Z and skip it entirely.
+        // Measuring a 64-bit key costs a full serialized copy of it, which for a
+        // multi-GB key-switching key dwarfs everything else the process holds; a
+        // 32-bit key is counted in place (estimator::key_sizes). Only one run per
+        // candidate needs the sizes (the speed probe), so the parallel noise runs
+        // pass -Z and skip it entirely.
         if ((k == 0) && report_sizes) {
-            // Separate scopes so two multi-GB buffers are never alive at once.
-            {
-                std::ostringstream ss;
-                lbcrypto::Serial::Serialize(cc.GetRefreshKey(), ss, lbcrypto::SerType::BINARY);
-                std::cout << "BootstrappingKeySize: " << static_cast<std::streamoff>(ss.tellp()) << std::endl;
-            }
-            {
-                std::ostringstream ss;
-                lbcrypto::Serial::Serialize(cc.GetSwitchKey(), ss, lbcrypto::SerType::BINARY);
-                std::cout << "KeySwitchingKeySize: " << static_cast<std::streamoff>(ss.tellp()) << std::endl;
-            }
+            const auto sizes = estimator::key_sizes(cc);
+            std::cout << "BootstrappingKeySize: " << sizes.btkey << std::endl;
+            std::cout << "KeySwitchingKeySize: " << sizes.ksk << std::endl;
+            std::cout << "KeyForm: refresh " << sizes.btkey_form << ", switch " << sizes.ksk_form << std::endl;
             {
                 std::ostringstream ss;
                 lbcrypto::Serial::Serialize(cts.front(), ss, lbcrypto::SerType::BINARY);

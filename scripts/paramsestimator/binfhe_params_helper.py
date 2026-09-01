@@ -31,29 +31,10 @@ def suppressed_stdout():
     finally:
         sys.stdout = saved
 
-def digits_for_base(modulus_bits, base):
-    """Digits OpenFHE will actually use for `base` at a modulus of `modulus_bits` bits.
-
-    Mirrors GetDigitCount() in core/include/math/nbtheory.h, which is exact
-    integer ceil(log_base(x)) over the EXCLUSIVE bound x. Two identities are what
-    let a bit COUNT stand in for the modulus itself, and both are assumptions
-    worth knowing:
-
-      - Q is LastPrime(numberBits, cyclOrder), so bitlen(Q-1) == numberBits.
-      - Qks is set to exactly 2^logQks, so bitlen(Qks-1) == logQks.
-
-    Integer arithmetic on purpose: OpenFHE moved off the floating-point form
-    because it disagreed with exact arithmetic on 1498 of 14087 boundary
-    neighbourhoods for bases 2-300, and ConvertToDouble is itself lossy above
-    2^53. Nothing here should reintroduce that.
-    """
-    base = int(base)
-    if base < 2:
-        raise ValueError("digit base must be at least 2, got %r" % base)
-    bits = base.bit_length() - 1
-    if (base & (base - 1)) != 0:
-        raise ValueError("digit base must be a power of two, got %r" % base)
-    return -(-int(modulus_bits) // bits)
+# Single definition, in the model library: it is pure arithmetic with no Sage or
+# OpenFHE dependency, and the DSE model needs it without importing this module.
+# Re-exported so existing callers keep using helperfncs.digits_for_base.
+from dse_model import digits_for_base
 
 # starting point for the estimator: the largest modulus OpenFHE's own security
 # tables consider safe at this dimension (see paramstable.max_logq)
@@ -151,6 +132,35 @@ def call_estimator(dim, mod, secret_dist="ternary", num_threads = 1, is_quantum 
 # Returns (dim, mod). The dimension is handed straight back -- nothing here
 # changes it -- so that (0, 0) can serve as the "no answer" sentinel callers test.
 def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternary", num_threads = 1, is_quantum = True):
+    """(dim, largest power-of-two modulus certified at `expected_sec_level` bits), or (0, 0).
+
+    Answered from the DSE security cache when it can be, and PRICED INTO IT when
+    it cannot. The cache stores, per (model, level, distribution, classical or
+    quantum, tolerance), the largest integer log2(q) the estimator certifies at
+    each dimension -- exactly what this function's doubling-and-halving walk used
+    to compute from scratch on every call, at ~1 s per estimator run and six or
+    so runs per dimension. A repeat run of the selector at the same level now
+    spends no estimator time on dimensions it has seen, and every dimension its
+    binary search on n visits becomes a priced point the DSE search enumerates
+    (dse_security.extra_dims), so the two tools feed each other.
+
+    Only standard levels (128/192/256 bits) map onto a cache curve; anything else
+    falls through to the original walk. Tolerance is 0 here, as it always was:
+    the selector certifies at the nominal level.
+    """
+    import dse_security as sec
+    level = sec.level_name(expected_sec_level, is_quantum)
+    if level is not None:
+        cache = sec.load()
+        b = sec.max_logq_certified(dim, level, secret_dist, SECURITY_MODEL, is_quantum,
+                                   cache=cache, tolerance_bits=0)
+        if b is None:
+            sec.price_dims([int(dim)], level, secret_dist, is_quantum, num_threads,
+                           cache=cache, verbose=False, tolerance_bits=0)
+            b = sec.max_logq_certified(dim, level, secret_dist, SECURITY_MODEL, is_quantum,
+                                       cache=cache, tolerance_bits=0)
+        return (dim, 2 ** b) if b is not None else (0, 0)
+
     def price(m):
         """Security bits at (dim, m), or None where the estimator cannot price it."""
         try:
@@ -194,16 +204,20 @@ def optimize_params_security(expected_sec_level, dim, mod, secret_dist = "ternar
 
 # Where the compiled binaries live.
 #
-# Defaults match both the README's native build (cmake -B build) and the
+# Defaults match both the documented native build (cmake -B build) and the
 # Dockerfile, resolved against the repository root rather than the working
 # directory so the scripts do not have to be run from one particular place.
-# Override either for an out-of-tree build:
+# Override for an out-of-tree build:
 #
-#   ESTIMATOR_BUILD_DIR=/path/to/build       NATIVE_SIZE=64, required
-#   ESTIMATOR_BUILD32_DIR=/path/to/build32   NATIVE_SIZE=32, optional
+#   ESTIMATOR_BUILD_DIR=/path/to/build
 #
-# The 32-bit build is genuinely optional: a plain `cmake -B build` produces only
-# the 64-bit one, and every candidate then runs there.
+# There is ONE build. It used to be two, one per OpenFHE native word size, with
+# a per-candidate dispatch to the 32-bit one when the ring modulus fit in 28
+# bits. Since OpenFHE 9e8045db the 64-bit build narrows each bootstrapping key
+# to its 32-bit internal form by default whenever that key's moduli fit, so the
+# dispatch happens inside the library -- and the genuine NATIVE_SIZE=32 build
+# was the worse measurement (no HAVE_INT128, so no lazy inner product; it loses
+# past six gadget digits). ESTIMATOR_BUILD32_DIR is no longer read.
 REPO_ROOT   = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BINARY_REL  = os.path.join("bin", "boolean_noise_estimate_script")
 
@@ -211,12 +225,11 @@ def _build_path(env_var, default_dir):
     root = os.environ.get(env_var) or os.path.join(REPO_ROOT, default_dir)
     return os.path.join(root, BINARY_REL)
 
-BINARY    = _build_path("ESTIMATOR_BUILD_DIR",   "build")     # NATIVE_SIZE=64
-BINARY32  = _build_path("ESTIMATOR_BUILD32_DIR", "build32")   # NATIVE_SIZE=32
+BINARY = _build_path("ESTIMATOR_BUILD_DIR", "build")
 
 # MAX_MODULUS_SIZE for NATIVEINT==32 (basicint.h). A parameter set whose ring
-# modulus fits in this many bits can run on the 32-bit build, which is roughly
-# twice as fast for BinFHE gates; anything larger must use the 64-bit build.
+# modulus fits in this many bits gets the 32-bit internal accumulator inside the
+# 64-bit build (roughly twice the gate speed); anything larger runs 64-bit.
 NS32_MAX_LOGQ = 28
 
 # OpenFHE declares BinFHEContextParams::modKS as uint32_t, so Qks must fit in
@@ -236,13 +249,13 @@ def clamp_moduli(logQ, logQks, ring_dim):
 
     Three constraints, and the order matters:
 
-    1. At ring dimension 1024, hold Q inside NS32_MAX_LOGQ so the candidate can
-       run on the 32-bit-word build, which is ~2.5x faster per gate. Costs at
-       most a bit of Q, and only for the distributions whose tables allow 29.
+    1. At ring dimension 1024, hold Q inside NS32_MAX_LOGQ so the candidate's
+       refresh key qualifies for the 32-bit internal accumulator, which is ~2x
+       faster per gate. Costs at most a bit of Q, and only for the distributions
+       whose tables allow 29.
     2. Qks must fit in modKS (uint32_t).
     3. Qks must not exceed Q. This runs LAST on purpose: it is what keeps the
-       N=1024 path inside the 28-bit cap once (1) has clamped Q, so a 30-bit Qks
-       can never reach a 32-bit build whose MAX_MODULUS_SIZE is 28.
+       N=1024 path inside the 28-bit cap once (1) has clamped Q.
     """
     logQ = int(logQ)
     if (ring_dim <= 1024):
@@ -252,13 +265,8 @@ def clamp_moduli(logQ, logQks, ring_dim):
     return logQ, logQks
 
 def binary_for(logQ):
-    """Pick the native word size for this candidate.
-
-    Falls back to the 64-bit build whenever the 32-bit one is absent (a native
-    checkout that only ran one cmake) or the modulus does not fit.
-    """
-    if (logQ is not None) and (int(logQ) <= NS32_MAX_LOGQ) and os.path.exists(BINARY32):
-        return BINARY32
+    """The one binary. Kept as a function so call sites read as they did when
+    the word size was a dispatch decision; the library makes it now."""
     return BINARY
 
 # Gates measured for the speed probe. The point is a stable per-gate time, not
@@ -370,7 +378,7 @@ def _opts_to_cmd(opts, binary = None):
             named = True
 
     if binary is None:
-        binary = BINARY32 if (named and (logQ is None) and os.path.exists(BINARY32)) else binary_for(logQ)
+        binary = binary_for(logQ)
 
     cmd = [binary]
     for flag, value in opts:
@@ -409,10 +417,6 @@ def _run(opts, threads = None, binary = None):
 
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
-    if (proc.returncode != 0) and (cmd[0] == BINARY32) and (binary is None):
-        # speculative 32-bit attempt on a named set whose modulus does not fit
-        return _run(opts, threads, binary=BINARY)
-
     if proc.returncode != 0:
         raise RuntimeError("%s exited %d:\n%s" % (cmd[0], proc.returncode, proc.stderr.strip()))
 
@@ -438,7 +442,7 @@ def measure_speed(opts, gates = SPEED_PROBE_GATES):
     probe += [("-i", gates), ("-K", 1)]
     out, _noise, binary = _run(probe)
     print("speed: %s (%s)" % (' '.join(shlex.quote(c) for c in _opts_to_cmd(probe, binary)),
-                              "32-bit words" if binary == BINARY32 else "64-bit words"))
+                              "32-bit key forms where they fit"))
     perf = get_performance(out)
     return float(perf["EvalBinGateTimeUs"]), perf, binary
 
@@ -469,20 +473,85 @@ def measure_noise(opts, num_of_keys, max_parallel = None, per_proc_bytes = None,
     print("noise: %d keys, %d at a time, %d thread(s) each: %s (%s)"
           % (num_of_keys, max_parallel, threads_each,
              ' '.join(shlex.quote(c) for c in _opts_to_cmd(per_key, binary)),
-             "32-bit words" if binary == BINARY32 else "64-bit words"))
+             "32-bit key forms where they fit"))
 
     noise = []
     out0  = None
+    outs  = []
     with ThreadPoolExecutor(max_workers=max_parallel) as pool:
         for out, part, _b in pool.map(lambda _: _run(per_key, threads=threads_each, binary=binary), range(num_of_keys)):
             if out0 is None:
                 out0 = out
+            outs.append(out)
             noise += part
 
     if len(noise) < 2:
         raise ValueError("need at least 2 noise samples for a stddev, got %d" % len(noise))
 
+    _check_observed_failures(outs, opts, stdev(noise))
+
     return out0, noise
+
+
+def _check_observed_failures(outs, opts, noise_stddev):
+    """Cross-check the gates that actually failed against what sigma predicts.
+
+    Every "failure rate" in this pipeline is computed from sigma. That is a claim
+    about the noise DISTRIBUTION, and it is blind to a configuration whose
+    bootstrapping key decodes a different secret than the ciphertext was
+    encrypted under: the gate then returns a clean, low-noise encryption of the
+    WRONG BIT, and no sigma-based number can see it.
+
+    Measured instance, GINX with a GAUSSIAN secret. CGGI's KeyGenAcc
+    (rgsw-acc-cggi.cpp:40) encodes the LWE secret as an indicator pair over
+    {-1, 0, +1}:
+
+        ek00[i] = RGSW(s == 1)     ek01[i] = RGSW(s == -1)
+
+    so any coefficient with |s| >= 2 is encoded {0, 0}, indistinguishable from
+    s == 0 -- and 63.7% of a stddev-3.19 Gaussian's coefficients are outside
+    {-1,0,1} (P(s in {-1,0,1}) = 0.3632, computed, not estimated). At n=64, q=1024, N=1024, logQ=25 that produced 202 failures in 400
+    gates, a coin flip, with sigma 12.9 against the ternary configuration's 10.3.
+    AP and LMKCDEY both use the centered value and are unaffected;
+    OpenFHE's isMethodCompatible() does not reject the pairing because it
+    inspects the paramset enum, not keyDist.
+
+    The bar is deliberately blunt: any observed failure at all, where the measured
+    sigma says to expect essentially none, is a broken configuration rather than
+    an unlucky sample.
+    """
+    flags = dict((f, v) for f, v in opts)
+    inputs = int(flags.get("-I", 2))
+    per_key_gates = int(flags.get("-i", 0))
+    if per_key_gates <= 0:
+        return
+
+    observed, gates = 0, 0
+    for out in outs:
+        perf = get_performance(out)
+        if "Failures" not in perf or "ctmodq" not in perf:
+            return                                  # nothing to check against
+        observed += int(perf["Failures"])
+        gates    += per_key_gates
+    if observed == 0:
+        return
+
+    ctmod    = int(get_performance(outs[0])["ctmodq"])
+    log2pf   = get_decryption_failure(noise_stddev, 2 * inputs, ctmod, inputs)
+    expected = gates * (2.0 ** log2pf) if log2pf > -400 else 0.0
+    if expected >= 0.01:
+        return                                      # failures are consistent with the noise
+
+    raise RuntimeError(
+        "%d of %d gates returned the wrong answer, but the measured sigma of %.4f "
+        "predicts %.3g failures (log2Pf = %.1f).\n"
+        "That is not a noise result: the configuration is semantically broken -- the "
+        "gate is computing something other than the requested function.\n"
+        "First thing to check: GINX (-t 2) requires a UNIFORM_TERNARY secret (-d 1). "
+        "It encodes the secret as an indicator pair over {-1,0,+1}, so a GAUSSIAN "
+        "secret silently loses every coefficient with |s| >= 2. Use LMKCDEY (-t 3) "
+        "or AP (-t 1) for Gaussian secrets."
+        % (observed, gates, noise_stddev, expected, log2pf))
 
 def param_opts(param_set, samples_per_key, num_of_inputs):
     return [ ("-n", param_set.n),

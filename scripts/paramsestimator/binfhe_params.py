@@ -27,7 +27,6 @@ import os
 import sys
 
 FORCE_q_eq_2N = False
-FORCE_openfhe32 = False
 FINAL_SAMPLES_FLOOR = 1000
 
 class SweepResults:
@@ -196,7 +195,7 @@ def parameter_selector(bootstrapping_tech, secret_dist, exp_sec_level, exp_decry
         opt_n = 0
         optlogmodQks = 0
         optB_ks = 0
-        while (ringsize_N <= (1024 if FORCE_openfhe32 else 2048)):
+        while (ringsize_N <= 2048):
             modulus_q = 2*ringsize_N if FORCE_q_eq_2N else ringsize_N
             loopq2N = False
             while (modulus_q <= 2*ringsize_N):

@@ -1,2 +1,9 @@
 build*/
 *.pyc
+
+# Per-machine compose settings (APP_UID/APP_GID). Local by definition: a
+# committed uid is one machine's, and the wrong one everywhere else.
+.env
+
+# Working notes, not part of the published documentation.
+.claude/

@@ -34,8 +34,12 @@
  */
 #define PROFILE
 #include "binfhecontext.h"
+#include <vector>
+#include <algorithm>
+#include <chrono>
 #include "utils/sertype.h"
 #include "utils/serial.h"
+#include "binfhe_cli.h"
 #include <getopt.h>
 
 using namespace lbcrypto;
@@ -51,6 +55,25 @@ uint32_t B_rk   = 32;
 double sigma    = 3.19;
 uint32_t bootstrapping_technique = 2;
 uint32_t secret_dist = 0;
+// numAutoKeys was hardcoded to 10, which made c3 -- the LMKCDEY automorphism
+// term the cost model already carries -- impossible to calibrate with this
+// binary at all.
+uint32_t numAutoKeys = 10;
+// Single -g cannot express a split map, and the search now proposes them (the
+// best STD192Q candidate is {2^12:240, 2^18:720}), so their cost was
+// unmeasurable here.
+std::map<uint32_t, uint32_t> gadgetBaseMap;
+// Follows the LIBRARY default, which flipped at 9e8045db: BTKeyGen(sk, mode,
+// internal32 = true). A 64-bit build now narrows each bootstrapping key to the
+// 32-bit internal form whenever that key's own moduli fit, with no flag and no
+// rebuild, so "no option given" here measures what a default caller gets.
+// -3 asks for it explicitly (a no-op now, kept so old plans still parse) and -6
+// forces the 64-bit forms, which is the only way left to time that path at
+// Q <= 2^28. See the note in boolean_noise_estimate_script.
+bool internal32 = true;
+// Timing a shipped set meant retyping its whole row and risking a transcription
+// error against the very table being compared to.
+std::string namedparamset;
 
 inline std::string usage() {
     return std::string("\n\nusage: \n"
@@ -65,6 +88,11 @@ inline std::string usage() {
                        "  -s sigma (standard deviation)\n"
                        "  -t bootstrapping technique\n"
                        "  -d secret key distribution\n"
+                       "  -a number of auto keys (LMKCDEY)\n"
+                       "  -G per-dimension gadget map, \"base:count,base:count\" (counts must sum to -n)\n"
+                       "  -p label for named binfhe param set (overrides other settings)\n"
+                       "  -3 32-bit internal key forms where they fit (Q <= 2^28); the DEFAULT since OpenFHE 9e8045db\n"
+                       "  -6 force the 64-bit key forms (times the pre-9e8045db path; the A/B against -3)\n"
                        "  -h display this message\n"
                      );
 }
@@ -87,10 +115,15 @@ int main(int argc, char* argv[]) {
                                            {"sigma (standard deviation)", required_argument, NULL, 's'},
                                            {"Bootstrapping technique", required_argument, NULL, 't'},
                                            {"Secret key distribution", required_argument, NULL, 'd'},
+                                           {"num auto keys", required_argument, NULL, 'a'},
+                                           {"gadget base map", required_argument, NULL, 'G'},
+                                           {"internal32", no_argument, NULL, '3'},
+                                           {"internal64", no_argument, NULL, '6'},
+                                           {"named paramset", required_argument, NULL, 'p'},
                                            {"help", no_argument, NULL, 'h'},
                                            {NULL, 0, NULL, 0}};
 
-    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:h";
+    const char* optstring = "n:N:q:Q:k:g:r:b:s:t:d:a:G:p:36h";
     while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         std::cout << "opt1: " << static_cast<char>(opt) << "; optarg: " << (optarg ? optarg : "(none)") << std::endl;
         switch (opt) {
@@ -127,6 +160,21 @@ int main(int argc, char* argv[]) {
             case 'd':
                 secret_dist = atoi(optarg);
                 break;
+            case 'a':
+                numAutoKeys = estimator::parse_u32(optarg, "num-auto-keys");
+                break;
+            case '3':
+                internal32 = true;
+                break;
+            case '6':
+                internal32 = false;
+                break;
+            case 'G':
+                gadgetBaseMap = estimator::parse_gadget_map(optarg);
+                break;
+            case 'p':
+                namedparamset = optarg;
+                break;
             case 'h':
                 std::cout << usage() << std::endl;
                 return 0;
@@ -146,7 +194,23 @@ int main(int argc, char* argv[]) {
     paramset.numberBits   = logQ;
     paramset.stdDev       = sigma;
     paramset.latticeParam = dim_n;
-    paramset.numAutoKeys = 10;
+    paramset.numAutoKeys  = numAutoKeys;
+
+    // A split map is only meaningful alongside the base it splits from, so -G
+    // supplies gadgetBase too when -g was not given -- mirroring
+    // boolean_noise_estimate_script, so the two harnesses cannot disagree about
+    // what a given command line means.
+    if (!gadgetBaseMap.empty()) {
+        uint32_t covered = 0;
+        for (auto&& kv : gadgetBaseMap)
+            covered += kv.second;
+        if (covered != dim_n)
+            OPENFHE_THROW("--G counts sum to " + std::to_string(covered) + ", not -n " +
+                          std::to_string(dim_n));
+        paramset.gadgetBaseMap = gadgetBaseMap;
+        if (B_g == 0)
+            paramset.gadgetBase = gadgetBaseMap.begin()->first;
+    }
 
     if (secret_dist == 0) {
         paramset.keyDist = GAUSSIAN;
@@ -180,7 +244,16 @@ int main(int argc, char* argv[]) {
     } else {
         OPENFHE_THROW("Invalid bootstrapping technique");
     }
-    cc.GenerateBinFHEContext(paramset, bt);
+    // -p overrides everything above, so a shipped set can be timed without
+    // retyping its row -- transcribing 12 fields by hand to time the very table
+    // you are comparing against is a needless way to measure the wrong thing.
+    if (!namedparamset.empty()) {
+        std::cout << "parameters from commandline overridden with: " << namedparamset << std::endl;
+        cc.GenerateBinFHEContext(estimator::lookup_paramset(namedparamset), bt);
+    }
+    else {
+        cc.GenerateBinFHEContext(paramset, bt);
+    }
 
     // Sample Program: Step 2: Key Generation
 
@@ -191,20 +264,30 @@ int main(int argc, char* argv[]) {
 
     TIC(t);
     // Generate the bootstrapping keys (refresh and switching keys)
-    cc.BTKeyGen(sk);
+    cc.BTKeyGen(sk, SYM_ENCRYPT, internal32);
 
     auto es = TOC_MS(t);
     std::cout << "time for bootstrapping key generation " << es << " milliseconds" << std::endl;
 
-    auto bkey  = cc.GetRefreshKey();
-    auto kskey = cc.GetSwitchKey();
-    std::ostringstream bkeystring;
-    lbcrypto::Serial::Serialize(bkey, bkeystring, lbcrypto::SerType::BINARY);
-    std::cout << "bootstrapping key size: " << static_cast<std::streamoff>(bkeystring.tellp()) << std::endl;
+    // HasInternal32*Key() never widens, so it is the safe way to ask which form
+    // the context holds.
+    std::cout << "internal32 refresh key: "
+              << (cc.HasInternal32RefreshKey() ? "yes" : "no") << std::endl;
+    std::cout << "internal32 switch key: "
+              << (cc.HasInternal32SwitchKey() ? "yes" : "no") << std::endl;
 
-    std::ostringstream kskeystring;
-    lbcrypto::Serial::Serialize(kskey, kskeystring, lbcrypto::SerType::BINARY);
-    std::cout << "key switching key size: " << static_cast<std::streamoff>(kskeystring.tellp()) << std::endl;
+    // Resident key material: a 32-bit key by the library's own byte count of its
+    // arrays, a 64-bit key by its serialized size. estimator::key_sizes says why
+    // the two have to be measured differently and why serializing the getters
+    // stopped working after OpenFHE 94229558. This is the footprint the model's
+    // key_word_bytes prices, so the table's key column and these lines describe
+    // the same quantity; gatetime_ab.py reads them as the check that a pin move
+    // landed. Nothing is widened or copied for a 32-bit key, so there is nothing
+    // to release afterwards (and CompressBTKeys() is private in any case).
+    const auto sizes = estimator::key_sizes(cc);
+    std::cout << "bootstrapping key size: " << sizes.btkey << std::endl;
+    std::cout << "key switching key size: " << sizes.ksk << std::endl;
+    std::cout << "key form: refresh " << sizes.btkey_form << ", switch " << sizes.ksk_form << std::endl;
 
     std::cout << "Completed the key generation." << std::endl;
 
@@ -247,32 +330,83 @@ int main(int argc, char* argv[]) {
     ct346.push_back(ct6);
 
     // Sample Program: Step 4: Evaluation
+    // Per-gate timings alongside the mean. A mean over 8 gates cannot tell
+    // "every gate is slower" from "one gate stalled", and a min-based
+    // measurement elsewhere is immune to the second -- so report both.
+    std::vector<double> _per;
+    std::chrono::steady_clock::time_point _gt0;
     TIC(t);
     // 1, 0, 0
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctAND1 = cc.EvalBinGate(AND3, ct134);
 
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
+
     // 1, 1, 0
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctAND2 = cc.EvalBinGate(AND3, ct123);
 
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
+
     // 1, 1, 1
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctAND3 = cc.EvalBinGate(AND3, ct125);
 
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
+
     // 0, 0, 0
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctAND4 = cc.EvalBinGate(AND3, ct346);
 
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
+
     // 1, 0, 0
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctOR1 = cc.EvalBinGate(OR3, ct134);
+
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
     // 1, 1, 0
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctOR2 = cc.EvalBinGate(OR3, ct123);
 
-    // 1, 1, 1
-    auto ctOR3 = cc.EvalBinGate(OR3, ct125);
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
 
     // 1, 1, 1
+    _gt0 = std::chrono::steady_clock::now();
+
+    auto ctOR3 = cc.EvalBinGate(OR3, ct125);
+
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
+
+    // 1, 1, 1
+    _gt0 = std::chrono::steady_clock::now();
+
     auto ctOR4 = cc.EvalBinGate(OR3, ct346);
+
+    _per.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - _gt0).count());
 
     es = TOC_MS(t);
     std::cout << "time for gate evaluation " << es << " milliseconds" << std::endl;
+    if (!_per.empty()) {
+        auto mn = *std::min_element(_per.begin(), _per.end());
+        auto mx = *std::max_element(_per.begin(), _per.end());
+        double sum = 0.0;
+        for (double v : _per) sum += v;
+        std::cout << "per-gate us:";
+        for (double v : _per) std::cout << " " << static_cast<long>(v);
+        std::cout << std::endl;
+        std::cout << "gate us min " << static_cast<long>(mn)
+                  << " mean " << static_cast<long>(sum / _per.size())
+                  << " max " << static_cast<long>(mx)
+                  << " skew " << (mn > 0 ? static_cast<long>(100 * mx / mn) : 0L)
+                  << "%" << std::endl;
+    }
 
     LWEPlaintext result;
 

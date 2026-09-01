@@ -1,0 +1,45 @@
+# Re-baseline the known-answer control (dse_measured.CONTROL) after the library
+# changes a control set's row. Run it from the repo root inside the container,
+# after the correctness gate has passed at the new pin:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm \
+#       estimator bash scripts/run-plan.sh scripts/dse-arms/plans/control-rebaseline.cmds
+#
+# WHEN. `dse.py doctor` (or dse_shipfit.control) prints LIVE TABLE DIFFERS on a
+# control set: the library's table no longer holds the parameters the stored
+# measurement was taken on. The entry is re-measured on the row the library ships
+# NOW and rewritten with the new parameters and the new sigma; it is never
+# re-pointed at the new row with the old sigma, which would turn a known answer
+# into a guess.
+#
+# WHAT. The four control sets, each in both key forms (-6 the 64-bit keys, -3 the
+# 32-bit forms the library defaults to), -i 2400 -K 6: 14400 gates per arm, six
+# keys, 28800 pooled per set. That is the precision CONTROL records and its
+# 6 percent tolerance is built on; the 20-row gate's -i 400 rows of the same
+# sets are the cheap A/B, not the baseline. Then
+#
+#   sage -python scripts/dse-tools/control_rebaseline.py LOG --write
+#
+# pools the two arms (root mean square, weighted by samples), takes each set's
+# parameters from the live table, refuses on a wrong answer, on arms that
+# disagree beyond |z| 3 with per-key scatter, or on a model error over the
+# control's 6 percent, and rewrites dse_measured.CONTROL with its pin and date.
+#
+# About two hours on the 8-core i7-9700 (a 2400-sample arm of these sets takes
+# 90 to 170 seconds, so a 14400-sample arm takes 9 to 17 minutes).
+# label: ctl_STD128_off
+build/bin/boolean_noise_estimate_script -p STD128 -t 2 -I 2 -i 2400 -K 6 -Z -6
+# label: ctl_STD128_on
+build/bin/boolean_noise_estimate_script -p STD128 -t 2 -I 2 -i 2400 -K 6 -Z -3
+# label: ctl_STD128_LMKCDEY_off
+build/bin/boolean_noise_estimate_script -p STD128_LMKCDEY -t 3 -I 2 -i 2400 -K 6 -Z -6
+# label: ctl_STD128_LMKCDEY_on
+build/bin/boolean_noise_estimate_script -p STD128_LMKCDEY -t 3 -I 2 -i 2400 -K 6 -Z -3
+# label: ctl_STD256Q_off
+build/bin/boolean_noise_estimate_script -p STD256Q -t 2 -I 2 -i 2400 -K 6 -Z -6
+# label: ctl_STD256Q_on
+build/bin/boolean_noise_estimate_script -p STD256Q -t 2 -I 2 -i 2400 -K 6 -Z -3
+# label: ctl_STD128_AP_off
+build/bin/boolean_noise_estimate_script -p STD128_AP -t 1 -I 2 -i 2400 -K 6 -Z -6
+# label: ctl_STD128_AP_on
+build/bin/boolean_noise_estimate_script -p STD128_AP -t 1 -I 2 -i 2400 -K 6 -Z -3

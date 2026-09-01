@@ -1,0 +1,68 @@
+# The correctness gate. Run this at a new OpenFHE pin BEFORE any timing is
+# trusted, and before spending hours on cells or on a table measurement.
+#
+# WHAT IT IS FOR. Noise has survived every pin move so far and gate cost has
+# survived none, so this is cheap insurance that the expensive step is measuring
+# the right thing. Every row must report FAILURES=0. The sigmas are then compared
+# against the previous pin's log:
+#
+#   bash scripts/dse-arms/pinmove-gate.sh OLD.log            # runs and compares
+#
+# THE TWO KINDS OF ROW. `newpath_*` and `mixed_*` carry their own geometry, so
+# the same configuration is measured at both pins and its sigma is comparable.
+# `ab_*` rows name a library set, and a named set's parameters belong to the
+# library's table, which changes between pins -- at 41709fbc the table became
+# this tool's own re-selected output -- so those are checked WITHIN the pin, as
+# the `_off`/`_on` A/B of the 64-bit against the 32-bit key forms.
+#
+# WHICH PATHS THEY DRIVE, on purpose. LMKCDEY at digitsG2 10 and 16 exercises the
+# worksharing digit decomposition (taken at digitsG2 >= 8 with 4+ threads sharing
+# the region) and the blocked 32-bit inner product. The `mixed_*` rows are logQ
+# 37, where a default caller gets a 64-bit accumulator under a 32-bit SWITCHING
+# key. A named LMKCDEY or AP set needs its own `-t`, or the context refuses it.
+#
+# WHAT THESE ROWS CANNOT DO. They are 200 samples over 2 keys, about 4 percent of
+# 1-sigma on a ratio. That detects a broken path and cannot resolve a
+# sub-percent noise change: at a pin that deliberately moves noise, pass the
+# predicted ratios (scripts/dse-tools/gate_expect.py) and read the 1-sigma column
+# before believing any single row. See docs/measurement-practice.md.
+# label: newpath_LMK_dG2_10_default
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 32:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z
+# label: newpath_LMK_dG2_10_w64
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 32:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z -6
+# label: newpath_LMK_dG2_16_default
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 8:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z
+# label: newpath_LMK_dG2_16_w64
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 8:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z -6
+# label: newpath_GINX_dG2_10_default
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 32:512 -t 2 -d 1 -I 2 -i 200 -K 2 -Z
+# label: newpath_GINX_dG2_10_w64
+build/bin/boolean_noise_estimate_script -n 512 -N 512 -q 1024 -Q 27 -k 32768 -b 32 -G 32:512 -t 2 -d 1 -I 2 -i 200 -K 2 -Z -6
+# label: mixed_LMK_lQ37_default
+build/bin/boolean_noise_estimate_script -n 512 -N 1024 -q 2048 -Q 37 -k 32768 -b 32 -G 1024:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z
+# label: mixed_LMK_lQ37_w64
+build/bin/boolean_noise_estimate_script -n 512 -N 1024 -q 2048 -Q 37 -k 32768 -b 32 -G 1024:512 -t 3 -d 1 -a 10 -I 2 -i 200 -K 2 -Z -6
+# label: mixed_GINX_lQ37_default
+build/bin/boolean_noise_estimate_script -n 512 -N 1024 -q 2048 -Q 37 -k 32768 -b 32 -G 1024:512 -t 2 -d 1 -I 2 -i 200 -K 2 -Z
+# label: mixed_GINX_lQ37_w64
+build/bin/boolean_noise_estimate_script -n 512 -N 1024 -q 2048 -Q 37 -k 32768 -b 32 -G 1024:512 -t 2 -d 1 -I 2 -i 200 -K 2 -Z -6
+# label: ab_STD128_off
+build/bin/boolean_noise_estimate_script -p STD128 -t 2 -I 2 -i 400 -K 6 -Z -6
+# label: ab_STD128_on
+build/bin/boolean_noise_estimate_script -p STD128 -t 2 -I 2 -i 400 -K 6 -Z -3
+# label: ab_STD128_LMKCDEY_off
+build/bin/boolean_noise_estimate_script -p STD128_LMKCDEY -t 3 -I 2 -i 400 -K 6 -Z -6
+# label: ab_STD128_LMKCDEY_on
+build/bin/boolean_noise_estimate_script -p STD128_LMKCDEY -t 3 -I 2 -i 400 -K 6 -Z -3
+# label: ab_STD256Q_off
+build/bin/boolean_noise_estimate_script -p STD256Q -t 2 -I 2 -i 400 -K 6 -Z -6
+# label: ab_STD256Q_on
+build/bin/boolean_noise_estimate_script -p STD256Q -t 2 -I 2 -i 400 -K 6 -Z -3
+# label: ab_STD128_AP_off
+build/bin/boolean_noise_estimate_script -p STD128_AP -t 1 -I 2 -i 400 -K 6 -Z -6
+# label: ab_STD128_AP_on
+build/bin/boolean_noise_estimate_script -p STD128_AP -t 1 -I 2 -i 400 -K 6 -Z -3
+# label: ab_STD256cand_on
+build/bin/boolean_noise_estimate_script -n 1088 -N 2048 -q 4096 -Q 27 -k 32768 -b 32 -G 128:1088 -t 2 -d 1 -I 2 -i 400 -K 6 -Z -3
+# label: ab_STD192cand_on
+build/bin/boolean_noise_estimate_script -n 896 -N 2048 -q 2048 -Q 28 -k 65536 -b 32 -G 128:784,1024:112 -t 2 -d 1 -I 2 -i 400 -K 6 -Z -3

@@ -4,9 +4,16 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # A tag, branch name, or full commit SHA. Bump here (or export
-        # OPENFHE_REF) to move to a different OpenFHE.
-        OPENFHE_REF: ${OPENFHE_REF:-252b2b1f410b0bd5f7b25faa4a4791d8a0882fdf}
+        # A tag, branch name, or FULL commit SHA -- `git fetch` rejects an
+        # abbreviated one ("couldn't find remote ref").
+        #
+        # THIS PIN IS DUPLICATED: here and in Dockerfile's ARG OPENFHE_REF. The
+        # Dockerfile default only applies to a plain `docker build`; compose
+        # always passes its own, so bumping only the Dockerfile silently rebuilds
+        # the OLD ref under the NEW tag. Move both together. (The `image:` line
+        # below is a third use of the same value, which is what makes the tag
+        # track the ref.)
+        OPENFHE_REF: ${OPENFHE_REF:-128582771b50ce798bfa36d63e43b550b1b17ea0}
         # OpenFHE's heavier translation units peak near 2 GB each. 4 jobs suits
         # a laptop or a memory-capped Docker Desktop VM; raise it on a big box.
         MAKE_JOBS: ${MAKE_JOBS:-4}
@@ -19,7 +26,7 @@ services:
         CC_BIN: ${CC_BIN:-clang-18}
         CXX_BIN: ${CXX_BIN:-clang++-18}
         WITH_NATIVEOPT: ${WITH_NATIVEOPT:-ON}
-    image: openfhe-lattice-estimator:${OPENFHE_REF:-252b2b1f410b0bd5f7b25faa4a4791d8a0882fdf}
+    image: openfhe-lattice-estimator:${OPENFHE_REF:-128582771b50ce798bfa36d63e43b550b1b17ea0}
 
     init: true
     stdin_open: true
@@ -36,11 +43,33 @@ services:
     pids_limit: 4096
 
     environment:
-      # README step 3: set to 1 for single-core KeyGen/EvalBinGate timings.
+      # Set to 1 for single-core KeyGen/EvalBinGate timings; see
+      # docs/measurement-practice.md.
       # Listed without a value so it is forwarded only when actually set on the
       # host. Assigning it an empty string instead makes libgomp print a warning
       # on stderr -- the same stream the scripts read noise values from, which
       # then dies in float('') far from the cause.
       - OMP_NUM_THREADS
+
+      # The measurement arms' knobs, so that
+      #   METHODS=LMKCDEY est estimator bash scripts/dse-arms/recalibrate.sh
+      # works from a host shell. Compose forwards nothing it is not told to, and
+      # a knob that does not arrive is worse than one that errors: the run
+      # measures the default and every line of its log looks right. Same rule as
+      # above -- no value, so each is forwarded only when actually set.
+      - METHODS          # which bootstrapping methods to measure
+      - STAGES           # which recalibrate.sh stages to run
+      - MT_THREADS       # thread count for the many-thread regime
+      - THREADS          # thread count for one gatecost-regime.sh invocation
+      - NS               # ring dimensions to sweep
+      - WORDS            # 32, 64, or both
+      - MAPS             # add two-base gadget maps to a sweep
+      - MAPS_ONLY        # measure only those
+      - PIN              # 0 to run unpinned
+      - PIN_CPUS         # a taskset -c list, chosen for you when unset
+      - DRY              # 1 to print the plan and measure nothing
+      - KEYS             # keys per row for the noise arms
+      - SAMPLES          # gates per key
+      - AP_KEY_GIB_MAX   # refuse an AP row whose refresh key exceeds this
 
     command: ["bash"]
